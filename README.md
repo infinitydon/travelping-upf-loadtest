@@ -75,6 +75,29 @@ the four-queue layout, per-session outer UDP source-port entropy, dynamic CPU
 allocation, and the 4,096-descriptor N3 receive rings are also part of the
 tested configuration.
 
+TRex reports the VFs as `net_iavf`, enables multi-queue mode, and has AVX2
+available in the guest. Its reduced CPU use is primarily attributable to
+direct SR-IOV DMA and the DPDK vector data path instead of the former
+virtio/QEMU software path. TRex still constructs and schedules every packet;
+checksum offload does not make the NIC act as the traffic generator.
+
+An A/B test at 1.2 Mpps and 96-byte frames showed:
+
+- Four workers: 9-16% peak utilization per worker and no queue-full events.
+- Two workers: 20-25% peak utilization per worker and no queue-full events.
+
+The default remains four workers for higher-rate and burst headroom. For tests
+that remain close to 1.2 Mpps, `trex.cpu.cores=2` and TRex CPU requests/limits
+of `4` return two exclusive CPUs to Kubernetes without reducing the requested
+rate.
+
+Additional host-side checks cannot be enforced by this chart. Keep the Intel
+PF NVM and `i40e` driver compatible and current, configure the PF MTU for any
+jumbo-frame tests, disable pause/PFC unless it is intentionally under test,
+and keep host housekeeping interrupts away from kubelet-exclusive CPUs. The
+guest already exposes AVX2 and a single NUMA node; manual core pinning inside
+the chart is neither needed nor desirable.
+
 For uplink tests, the configured packet size is the outer N3 Ethernet frame
 without FCS. VPP removes the 36-byte outer IPv4/UDP/GTP-U encapsulation before
 transmitting on N6, so N6 bandwidth is expected to be lower than N3 bandwidth
