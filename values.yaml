@@ -102,11 +102,11 @@ upf:
   # Resource limits (Guaranteed QoS)
   resources:
     requests:
-      cpu: "3"
+      cpu: "8"
       memory: "4Gi"
       hugepages-1Gi: "3Gi"
     limits:
-      cpu: "3"
+      cpu: "8"
       memory: "4Gi"
       hugepages-1Gi: "3Gi"
 

@@ -20,7 +20,7 @@ require GHCR credentials.
 ```sh
 helm upgrade --install upf-loadtest \
   oci://ghcr.io/infinitydon/travelping-upf-loadtest \
-  --version 0.1.9 \
+  --version 0.1.10 \
   --namespace upf-loadtest \
   --create-namespace \
   --wait
@@ -30,7 +30,7 @@ To inspect the chart locally:
 
 ```sh
 helm pull oci://ghcr.io/infinitydon/travelping-upf-loadtest \
-  --version 0.1.9 \
+  --version 0.1.10 \
   --untar
 ```
 
@@ -43,8 +43,8 @@ container cpusets at runtime; the chart does not contain host CPU IDs. The
 entrypoints support both cgroup cpuset files and the process affinity exposed
 by `/proc/self/status`.
 
-- UPG-VPP requests 3 CPUs and assigns the first to its main thread and the
-  remaining 2 to workers.
+- UPG-VPP requests 8 CPUs and assigns the first to its main thread and the
+  remaining 7 to workers.
 - TRex requests 6 CPUs and assigns the first to master, the second to latency,
   and the remaining 4 to dataplane workers.
 
