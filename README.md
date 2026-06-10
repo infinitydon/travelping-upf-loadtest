@@ -10,7 +10,7 @@ provisioning, and raises the test QER limits.
 Source and release documentation:
 
 - https://github.com/infinitydon/pfcpsim-travelping
-- https://github.com/infinitydon/pfcpsim-travelping/releases/tag/v1.4.4-7
+- https://github.com/infinitydon/pfcpsim-travelping/releases/tag/v1.4.4-8
 
 The chart and patched simulator image are public, so installation does not
 require GHCR credentials.
