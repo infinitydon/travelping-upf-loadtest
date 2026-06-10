@@ -20,7 +20,7 @@ require GHCR credentials.
 ```sh
 helm upgrade --install upf-loadtest \
   oci://ghcr.io/infinitydon/travelping-upf-loadtest \
-  --version 0.1.1 \
+  --version 0.1.2 \
   --namespace upf-loadtest \
   --create-namespace \
   --wait
@@ -30,7 +30,7 @@ To inspect the chart locally:
 
 ```sh
 helm pull oci://ghcr.io/infinitydon/travelping-upf-loadtest \
-  --version 0.1.1 \
+  --version 0.1.2 \
   --untar
 ```
 

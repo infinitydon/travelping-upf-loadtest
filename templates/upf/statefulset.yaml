@@ -11,11 +11,11 @@ spec:
   replicas: 1
   selector:
     matchLabels:
-      {{- include "travelping-upf-loadtest.upf.labels" . | nindent 6 }}
+      {{- include "travelping-upf-loadtest.upf.selectorLabels" . | nindent 6 }}
   template:
     metadata:
       labels:
-        {{- include "travelping-upf-loadtest.upf.labels" . | nindent 8 }}
+        {{- include "travelping-upf-loadtest.upf.selectorLabels" . | nindent 8 }}
       annotations:
         qos.class: {{ .Values.global.qosClass }}
         checksum/entrypoint: {{ include (print $.Template.BasePath "/upf/configmap-entrypoint.yaml") . | sha256sum }}

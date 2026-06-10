@@ -10,7 +10,7 @@ metadata:
 spec:
   selector:
     matchLabels:
-      {{- include "travelping-upf-loadtest.upf.labels" . | nindent 6 }}
+      {{- include "travelping-upf-loadtest.upf.selectorLabels" . | nindent 6 }}
   endpoints:
     - port: cli
       path: /metrics
@@ -28,7 +28,7 @@ metadata:
 spec:
   selector:
     matchLabels:
-      {{- include "travelping-upf-loadtest.trex.labels" . | nindent 6 }}
+      {{- include "travelping-upf-loadtest.trex.selectorLabels" . | nindent 6 }}
       service: http
   endpoints:
     - port: http
@@ -47,7 +47,7 @@ metadata:
 spec:
   selector:
     matchLabels:
-      {{- include "travelping-upf-loadtest.pfcp-sim.labels" . | nindent 6 }}
+      {{- include "travelping-upf-loadtest.pfcp-sim.selectorLabels" . | nindent 6 }}
   endpoints:
     - port: pfcp
       path: /metrics

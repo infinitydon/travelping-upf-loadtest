@@ -19,5 +19,5 @@ spec:
       targetPort: 4501
       protocol: TCP
   selector:
-    {{- include "travelping-upf-loadtest.trex.labels" . | nindent 4 }}
+    {{- include "travelping-upf-loadtest.trex.selectorLabels" . | nindent 4 }}
 {{- end }}

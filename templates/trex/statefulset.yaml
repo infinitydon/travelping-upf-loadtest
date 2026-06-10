@@ -11,11 +11,11 @@ spec:
   replicas: 1
   selector:
     matchLabels:
-      {{- include "travelping-upf-loadtest.trex.labels" . | nindent 6 }}
+      {{- include "travelping-upf-loadtest.trex.selectorLabels" . | nindent 6 }}
   template:
     metadata:
       labels:
-        {{- include "travelping-upf-loadtest.trex.labels" . | nindent 8 }}
+        {{- include "travelping-upf-loadtest.trex.selectorLabels" . | nindent 8 }}
       annotations:
         qos.class: {{ .Values.global.qosClass }}
         cpu-policy: {{ .Values.trex.cpu.policy }}

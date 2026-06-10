@@ -13,11 +13,11 @@ spec:
     rollingUpdate: null
   selector:
     matchLabels:
-      {{- include "travelping-upf-loadtest.pfcp-sim.labels" . | nindent 6 }}
+      {{- include "travelping-upf-loadtest.pfcp-sim.selectorLabels" . | nindent 6 }}
   template:
     metadata:
       labels:
-        {{- include "travelping-upf-loadtest.pfcp-sim.labels" . | nindent 8 }}
+        {{- include "travelping-upf-loadtest.pfcp-sim.selectorLabels" . | nindent 8 }}
       annotations:
         qos.class: "Burstable"
         checksum/sessions: {{ include (print $.Template.BasePath "/pfcp-sim/configmap-sessions.yaml") . | sha256sum }}

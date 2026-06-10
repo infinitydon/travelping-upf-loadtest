@@ -49,6 +49,35 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
 {{/*
+Legacy component selectors are intentionally stable. Chart 0.1.0 included
+these labels in immutable workload selectors, so retaining their original
+values permits in-place upgrades while preventing future version churn.
+*/}}
+{{- define "travelping-upf-loadtest.upf.selectorLabels" -}}
+helm.sh/chart: travelping-upf-loadtest-0.1.0
+{{ include "travelping-upf-loadtest.selectorLabels" . }}
+app.kubernetes.io/version: "1.0.0"
+app.kubernetes.io/managed-by: Helm
+component: upf
+{{- end }}
+
+{{- define "travelping-upf-loadtest.trex.selectorLabels" -}}
+helm.sh/chart: travelping-upf-loadtest-0.1.0
+{{ include "travelping-upf-loadtest.selectorLabels" . }}
+app.kubernetes.io/version: "1.0.0"
+app.kubernetes.io/managed-by: Helm
+component: trex
+{{- end }}
+
+{{- define "travelping-upf-loadtest.pfcp-sim.selectorLabels" -}}
+helm.sh/chart: travelping-upf-loadtest-0.1.0
+{{ include "travelping-upf-loadtest.selectorLabels" . }}
+app.kubernetes.io/version: "1.0.0"
+app.kubernetes.io/managed-by: Helm
+component: pfcp-sim
+{{- end }}
+
+{{/*
 Create the name of the service account to use
 */}}
 {{- define "travelping-upf-loadtest.serviceAccountName" -}}
