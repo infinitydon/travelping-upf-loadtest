@@ -10,7 +10,7 @@ provisioning, and raises the test QER limits.
 Source and release documentation:
 
 - https://github.com/infinitydon/pfcpsim-travelping
-- https://github.com/infinitydon/pfcpsim-travelping/releases/tag/v1.4.4-8
+- https://github.com/infinitydon/pfcpsim-travelping/releases/tag/v1.4.4-9
 
 The chart and patched simulator image are public, so installation does not
 require GHCR credentials.
@@ -20,7 +20,7 @@ require GHCR credentials.
 ```sh
 helm upgrade --install upf-loadtest \
   oci://ghcr.io/infinitydon/travelping-upf-loadtest \
-  --version 0.1.2 \
+  --version 0.1.4 \
   --namespace upf-loadtest \
   --create-namespace \
   --wait
@@ -30,7 +30,7 @@ To inspect the chart locally:
 
 ```sh
 helm pull oci://ghcr.io/infinitydon/travelping-upf-loadtest \
-  --version 0.1.2 \
+  --version 0.1.4 \
   --untar
 ```
 

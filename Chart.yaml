@@ -2,7 +2,7 @@ apiVersion: v2
 name: travelping-upf-loadtest
 description: Helm chart for Travelping UPF load testing with Cisco TRex and PFCP simulator
 type: application
-version: 0.1.3
+version: 0.1.4
 appVersion: "1.0.0"
 keywords:
   - 5g
