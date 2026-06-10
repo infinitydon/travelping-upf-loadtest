@@ -57,6 +57,7 @@ IDs, when tuning the chart.
 The GTP-U profile assigns a deterministic outer UDP source port to each
 simulated session. The destination remains UDP 2152. This supplies RSS entropy
 so the Intel N3 VF distributes uplink traffic across its four receive queues.
+N3 uses 4,096 RX descriptors per queue to absorb short scheduling bursts.
 
 ## Publish a release
 

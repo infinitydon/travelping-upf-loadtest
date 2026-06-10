@@ -24,6 +24,7 @@ upf:
       pciAddress: "0000:01:00.0"
       rxQueues: 4
       txQueues: 4
+      rxDescriptors: 4096
       ip: "10.0.3.10/24"
       gateway: "10.0.3.1"
       mtu: 9001

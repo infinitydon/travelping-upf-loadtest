@@ -27,6 +27,9 @@ data:
         name {{ $iface.name }}
         num-rx-queues {{ $iface.rxQueues }}
         num-tx-queues {{ $iface.txQueues }}
+        {{- with $iface.rxDescriptors }}
+        num-rx-desc {{ . }}
+        {{- end }}
       }
       {{- end }}
       # UIO driver for VFIO
