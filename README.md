@@ -54,6 +54,10 @@ receives the kernel-backed `enp6s0` peer through Multus. N4 uses one queue in
 both VPP and the PFCP simulator. Change CPU and queue counts, not physical CPU
 IDs, when tuning the chart.
 
+The GTP-U profile assigns a deterministic outer UDP source port to each
+simulated session. The destination remains UDP 2152. This supplies RSS entropy
+so the Intel N3 VF distributes uplink traffic across its four receive queues.
+
 ## Publish a release
 
 Chart releases are immutable. Update `version` in `Chart.yaml`, commit the
