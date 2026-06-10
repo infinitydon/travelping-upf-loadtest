@@ -40,12 +40,13 @@ spec:
         - name: pfcp-sim
           image: "{{ .Values.pfcpSim.image.repository }}:{{ .Values.pfcpSim.image.tag }}"
           imagePullPolicy: {{ .Values.pfcpSim.image.pullPolicy }}
-          command: ["/usr/local/bin/pfcpsim"]
+          command: ["/bin/sh", "-ceu"]
           args:
-            - --interface
-            - "{{ .Values.pfcpSim.config.interface }}"
-            - --port
-            - "54321"
+            - |
+              ethtool -L {{ .Values.pfcpSim.config.interface }} combined {{ .Values.pfcpSim.config.queues }}
+              exec /usr/local/bin/pfcpsim \
+                --interface {{ .Values.pfcpSim.config.interface }} \
+                --port 54321
           securityContext:
             {{- toYaml .Values.pfcpSim.securityContext | nindent 12 }}
           resources:

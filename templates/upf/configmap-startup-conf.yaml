@@ -23,7 +23,11 @@ data:
 
     dpdk {
       {{- range $name, $iface := .Values.upf.interfaces }}
-      dev {{ $iface.pciAddress }} {name {{ $iface.name }}}
+      dev {{ $iface.pciAddress }} {
+        name {{ $iface.name }}
+        num-rx-queues {{ $iface.rxQueues }}
+        num-tx-queues {{ $iface.txQueues }}
+      }
       {{- end }}
       # UIO driver for VFIO
       uio-driver vfio-pci

@@ -10,7 +10,7 @@ provisioning, and raises the test QER limits.
 Source and release documentation:
 
 - https://github.com/infinitydon/pfcpsim-travelping
-- https://github.com/infinitydon/pfcpsim-travelping/releases/tag/v1.4.4-10
+- https://github.com/infinitydon/pfcpsim-travelping/releases/tag/v1.4.4-11
 
 The chart and patched simulator image are public, so installation does not
 require GHCR credentials.
@@ -20,7 +20,7 @@ require GHCR credentials.
 ```sh
 helm upgrade --install upf-loadtest \
   oci://ghcr.io/infinitydon/travelping-upf-loadtest \
-  --version 0.1.8 \
+  --version 0.1.9 \
   --namespace upf-loadtest \
   --create-namespace \
   --wait
@@ -30,7 +30,7 @@ To inspect the chart locally:
 
 ```sh
 helm pull oci://ghcr.io/infinitydon/travelping-upf-loadtest \
-  --version 0.1.8 \
+  --version 0.1.9 \
   --untar
 ```
 
@@ -43,13 +43,16 @@ container cpusets at runtime; the chart does not contain host CPU IDs. The
 entrypoints support both cgroup cpuset files and the process affinity exposed
 by `/proc/self/status`.
 
-- UPG-VPP requests 8 CPUs and assigns the first to its main thread and the
-  remaining 7 to workers.
+- UPG-VPP requests 3 CPUs and assigns the first to its main thread and the
+  remaining 2 to workers.
 - TRex requests 6 CPUs and assigns the first to master, the second to latency,
   and the remaining 4 to dataplane workers.
 
 TRex's four workers match the four virtio queues configured on both traffic
-interfaces. Change CPU counts, not physical CPU IDs, when tuning the chart.
+interfaces. VPP polls four RX/TX queues on N3 and N6. N4 uses one queue in
+both VPP and the PFCP simulator because multiqueue virtio does not preserve
+PFCP request/response delivery reliably on this path. Change CPU and queue
+counts, not physical CPU IDs, when tuning the chart.
 
 ## Publish a release
 
