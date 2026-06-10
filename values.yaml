@@ -196,6 +196,8 @@ trex:
 # PFCP Simulator Configuration
 pfcpSim:
   enabled: true
+  sessionCreator:
+    enabled: true
   image:
     repository: "ghcr.io/infinitydon/pfcpsim-travelping"
     tag: "v1.4.4-7"
