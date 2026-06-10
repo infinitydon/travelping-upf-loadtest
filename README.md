@@ -59,6 +59,29 @@ simulated session. The destination remains UDP 2152. This supplies RSS entropy
 so the Intel N3 VF distributes uplink traffic across its four receive queues.
 N3 uses 4,096 RX descriptors per queue to absorb short scheduling bursts.
 
+## Performance notes
+
+The Intel interfaces in this topology are SR-IOV VFs backed by physical
+Intel 700 Series NICs, rather than direct physical functions. In this
+environment they were materially more performant than the earlier
+Proxmox/QEMU virtio-net interfaces: the virtio path repeatedly saturated TRex
+during a 600 Kpps, 300-second run, while the tuned Intel VF path completed
+1.2 Mpps for 300 seconds with no TRex queue-full events and low packet loss.
+
+The VPP interfaces use the DPDK `iAVF` driver. Runtime inspection confirms
+active RSS, IPv4 receive checksum, scatter, IPv4/UDP/TCP transmit checksum,
+and multi-segment transmit support. The gain is not solely an offload result:
+the four-queue layout, per-session outer UDP source-port entropy, dynamic CPU
+allocation, and the 4,096-descriptor N3 receive rings are also part of the
+tested configuration.
+
+For uplink tests, the configured packet size is the outer N3 Ethernet frame
+without FCS. VPP removes the 36-byte outer IPv4/UDP/GTP-U encapsulation before
+transmitting on N6, so N6 bandwidth is expected to be lower than N3 bandwidth
+even when packet forwarding is lossless. A 96-byte N3 frame becomes roughly a
+60-byte N6 frame; at 1.2 Mpps their calculated L1 rates are approximately
+1,152 Mbps and 768 Mbps, respectively.
+
 ## Publish a release
 
 Chart releases are immutable. Update `version` in `Chart.yaml`, commit the
