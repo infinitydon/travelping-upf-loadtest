@@ -63,7 +63,7 @@ spec:
       "cniVersion": "0.3.1",
       "name": "{{ include "travelping-upf-loadtest.fullname" . }}-n4",
       "type": "host-device",
-      "pciBusID": "{{ .Values.pfcpSim.config.pciAddress }}",
+      "device": "{{ .Values.pfcpSim.config.hostInterface }}",
       "ipam": {
         "type": "static",
         "addresses": [

@@ -48,11 +48,11 @@ by `/proc/self/status`.
 - TRex requests 6 CPUs and assigns the first to master, the second to latency,
   and the remaining 4 to dataplane workers.
 
-TRex's four workers match the four virtio queues configured on both traffic
-interfaces. VPP polls four RX/TX queues on N3 and N6. N4 uses one queue in
-both VPP and the PFCP simulator because multiqueue virtio does not preserve
-PFCP request/response delivery reliably on this path. Change CPU and queue
-counts, not physical CPU IDs, when tuning the chart.
+TRex's four workers match the four queues configured on both Intel VF traffic
+interfaces. VPP uses separate Intel VFs for N3, N4, and N6, while PFCP-sim
+receives the kernel-backed `enp6s0` peer through Multus. N4 uses one queue in
+both VPP and the PFCP simulator. Change CPU and queue counts, not physical CPU
+IDs, when tuning the chart.
 
 ## Publish a release
 

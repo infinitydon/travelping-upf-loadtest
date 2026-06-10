@@ -21,7 +21,7 @@ upf:
   interfaces:
     n3:
       name: "n3"
-      pciAddress: "0000:00:15.0"
+      pciAddress: "0000:01:00.0"
       rxQueues: 4
       txQueues: 4
       ip: "10.0.3.10/24"
@@ -30,7 +30,7 @@ upf:
       vrf: 1
     n4:
       name: "n4"
-      pciAddress: "0000:00:16.0"
+      pciAddress: "0000:02:00.0"
       rxQueues: 1
       txQueues: 1
       ip: "10.0.4.9/24"
@@ -39,7 +39,7 @@ upf:
       vrf: 0
     n6:
       name: "n6"
-      pciAddress: "0000:00:17.0"
+      pciAddress: "0000:03:00.0"
       rxQueues: 4
       txQueues: 4
       ip: "10.0.5.9/24"
@@ -136,11 +136,11 @@ trex:
   # TRex interfaces (2 ports: port 0 -> N3, port 1 -> N6)
   interfaces:
     port0:
-      pciAddress: "0000:01:01.0"
+      pciAddress: "0000:04:00.0"
       ip: "10.0.3.1/24"
       gateway: "10.0.3.10"
     port1:
-      pciAddress: "0000:01:02.0"
+      pciAddress: "0000:05:00.0"
       ip: "10.0.5.1/24"
       gateway: "10.0.5.9"
 
@@ -213,10 +213,11 @@ pfcpSim:
     upfPort: 8805
     localIp: "10.0.4.1"
     localPort: 8805
-    interface: "n4"
+    hostInterface: "enp6s0"
+    interface: "enp6s0"
     queues: 1
-    pciAddress: "0000:01:03.0"
-    kernelDriver: "virtio-pci"
+    pciAddress: "0000:06:00.0"
+    kernelDriver: "iavf"
     sessionCount: 1000
     sessionTemplate:
       imsi: "999700000000001"
