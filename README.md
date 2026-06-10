@@ -20,7 +20,7 @@ require GHCR credentials.
 ```sh
 helm upgrade --install upf-loadtest \
   oci://ghcr.io/infinitydon/travelping-upf-loadtest \
-  --version 0.1.6 \
+  --version 0.1.7 \
   --namespace upf-loadtest \
   --create-namespace \
   --wait
@@ -30,7 +30,7 @@ To inspect the chart locally:
 
 ```sh
 helm pull oci://ghcr.io/infinitydon/travelping-upf-loadtest \
-  --version 0.1.6 \
+  --version 0.1.7 \
   --untar
 ```
 
@@ -42,11 +42,12 @@ host cores because this cluster uses CFS quotas rather than static CPU
 Manager cpusets:
 
 - UPG-VPP: main core 2, worker cores 3-4.
-- TRex: master core 5, latency core 6, dataplane cores 7-8.
+- TRex: master core 5, latency core 6, dataplane core 7.
 
-Keep these assignments disjoint when overriding either workload. TRex uses
-two dataplane workers and requests four CPUs so generator saturation is less
-likely to be mistaken for a UPF forwarding limit.
+Keep these assignments disjoint when overriding either workload. The virtio
+ports expose one TX queue, so TRex must use one dataplane worker. Queue
+pressure is bounded by the WebUI runner rather than hidden by prolonged
+software queue draining.
 
 ## Publish a release
 
