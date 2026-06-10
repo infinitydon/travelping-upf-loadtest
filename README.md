@@ -20,7 +20,7 @@ require GHCR credentials.
 ```sh
 helm upgrade --install upf-loadtest \
   oci://ghcr.io/infinitydon/travelping-upf-loadtest \
-  --version 0.1.5 \
+  --version 0.1.6 \
   --namespace upf-loadtest \
   --create-namespace \
   --wait
@@ -30,12 +30,23 @@ To inspect the chart locally:
 
 ```sh
 helm pull oci://ghcr.io/infinitydon/travelping-upf-loadtest \
-  --version 0.1.5 \
+  --version 0.1.6 \
   --untar
 ```
 
 The test result is written to `/results/gtpu-uplink.json` in the TRex
 `test-runner` container and is also printed to its logs.
+
+The default CPU layout keeps the packet-processing applications on disjoint
+host cores because this cluster uses CFS quotas rather than static CPU
+Manager cpusets:
+
+- UPG-VPP: main core 2, worker cores 3-4.
+- TRex: master core 5, latency core 6, dataplane cores 7-8.
+
+Keep these assignments disjoint when overriding either workload. TRex uses
+two dataplane workers and requests four CPUs so generator saturation is less
+likely to be mistaken for a UPF forwarding limit.
 
 ## Publish a release
 

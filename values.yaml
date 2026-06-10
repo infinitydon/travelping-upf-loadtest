@@ -142,8 +142,11 @@ trex:
 
   # CPU configuration
   cpu:
-    cores: 1
+    cores: 2
     policy: "dedicated"
+    masterCore: 5
+    latencyCore: 6
+    workerCores: [7, 8]
 
   # Hugepages
   hugepages:
@@ -153,7 +156,7 @@ trex:
   # TRex config
   config:
     portLimit: 2
-    cores: 1
+    cores: 2
     portInfo:
       - ip: "10.0.3.1"
         defaultGw: "10.0.3.10"
@@ -170,11 +173,11 @@ trex:
   # Resource limits (Guaranteed QoS)
   resources:
     requests:
-      cpu: "3"
+      cpu: "4"
       memory: "2Gi"
       hugepages-1Gi: "2Gi"
     limits:
-      cpu: "3"
+      cpu: "4"
       memory: "2Gi"
       hugepages-1Gi: "2Gi"
 

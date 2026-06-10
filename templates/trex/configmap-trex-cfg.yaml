@@ -15,6 +15,15 @@ data:
       {{- range $name, $iface := .Values.trex.interfaces }}
         - "{{ $iface.pciAddress }}"
       {{- end }}
+      platform      :
+        master_thread_id  : {{ .Values.trex.cpu.masterCore }}
+        latency_thread_id : {{ .Values.trex.cpu.latencyCore }}
+        dual_if:
+          - socket  : 0
+            threads :
+            {{- range .Values.trex.cpu.workerCores }}
+              - {{ . }}
+            {{- end }}
       port_info     :
       {{- range $iface := .Values.trex.config.portInfo }}
         - ip         : {{ $iface.ip }}
