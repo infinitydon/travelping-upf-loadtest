@@ -84,7 +84,7 @@ spec:
             - name: TREX_CFG
               value: /etc/trex_cfg.yaml
             - name: PYTHONPATH
-              value: /opt/trex/v3.06/automation/trex_control_plane/interactive
+              value: {{ printf "%s/automation/trex_control_plane/interactive" .Values.trex.installDir | quote }}
           volumeMounts:
             - name: trex-cfg
               mountPath: /opt/trex/start-trex.sh
@@ -134,7 +134,7 @@ spec:
                 sleep 5
               done
               sleep {{ .Values.trex.test.startDelaySeconds }}
-              cd /opt/trex/v3.06
+              cd {{ .Values.trex.installDir | quote }}
               python3 /opt/trex/scripts/run_test.py \
                 --profile {{ .Values.trex.test.profile }} \
                 --duration {{ .Values.trex.test.duration }} \
@@ -144,7 +144,7 @@ spec:
             runAsUser: 0
           env:
             - name: PYTHONPATH
-              value: /opt/trex/v3.06/automation/trex_control_plane/interactive
+              value: {{ printf "%s/automation/trex_control_plane/interactive" .Values.trex.installDir | quote }}
           volumeMounts:
             - name: trex-scripts
               mountPath: /opt/trex/scripts

@@ -72,9 +72,10 @@ data:
 
     echo "[INFO] Final /etc/trex_cfg.yaml:"
     cat /etc/trex_cfg.yaml
-    cd /opt/trex/v3.06
+    cd {{ .Values.trex.installDir | quote }}
     exec ./t-rex-64 -i --stl --cfg /etc/trex_cfg.yaml \
       --prefix "$(hostname)" \
+      --no-scapy-server \
       --no-hw-flow-stat \
       --mbuf-factor 2
 {{- end }}

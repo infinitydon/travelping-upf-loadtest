@@ -1,7 +1,7 @@
 # Travelping UPF load test
 
 This chart targets the `ebpf-bng-node-01` VFIO layout defined in
-`values.yaml`. It deploys Travelping UPG-VPP, TRex v3.06, and a patched
+`values.yaml`. It deploys Travelping UPG-VPP, TRex v3.08, and a patched
 `pfcpsim` compatible with UPG-VPP v2. The simulator patch supplies Network
 Instance IEs, corrects downlink matching and heartbeat handling, removes
 invalid placeholder encapsulation, disables reporting rules that disrupt bulk
@@ -20,7 +20,7 @@ require GHCR credentials.
 ```sh
 helm upgrade --install upf-loadtest \
   oci://ghcr.io/infinitydon/travelping-upf-loadtest \
-  --version 0.1.10 \
+  --version 0.1.14 \
   --namespace upf-loadtest \
   --create-namespace \
   --wait
@@ -30,7 +30,7 @@ To inspect the chart locally:
 
 ```sh
 helm pull oci://ghcr.io/infinitydon/travelping-upf-loadtest \
-  --version 0.1.10 \
+  --version 0.1.14 \
   --untar
 ```
 
@@ -90,6 +90,23 @@ The default remains four workers for higher-rate and burst headroom. For tests
 that remain close to 1.2 Mpps, `trex.cpu.cores=2` and TRex CPU requests/limits
 of `4` return two exclusive CPUs to Kubernetes without reducing the requested
 rate.
+
+TRex v3.08 was validated using `ghcr.io/infinitydon/trex:v3.08` with four
+workers and the Intel VF topology. The image omits the protocol database needed
+by TRex's optional Scapy GUI server, so the chart starts it with
+`--no-scapy-server`; STL RPC traffic generation is unaffected. The following
+96-byte, 1,000-session uplink runs completed without queue-full events:
+
+| Requested rate | Duration | Effective TX | Loss | Peak TRex CPU | Peak worker CPU |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| 1.2 Mpps | 300 s | 1.193 Mpps | 0.00482% | 9.32% | 16% |
+| 1.5 Mpps | 60 s | 1.489 Mpps | 0.00003% | 11.10% | 17% |
+| 2.0 Mpps | 60 s | 1.989 Mpps | 0.00042% | 16.25% | 23% |
+| 3.0 Mpps | 60 s | 2.981 Mpps | 0.00095% | 19.56% | 32% |
+
+These results show that TRex was not generator-limited through 3 Mpps. They do
+not isolate the v3.08 upgrade from the Intel VF, RSS, descriptor, and queue
+tuning, so they should not be interpreted as a version-only performance gain.
 
 Additional host-side checks cannot be enforced by this chart. Keep the Intel
 PF NVM and `i40e` driver compatible and current, configure the PF MTU for any
