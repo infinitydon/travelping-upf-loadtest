@@ -1,0 +1,23 @@
+{{- if .Values.trex.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "travelping-upf-loadtest.fullname" . }}-trex-rpc
+  namespace: {{ .Values.namespace.name }}
+  labels:
+    {{- include "travelping-upf-loadtest.trex.labels" . | nindent 4 }}
+    service: rpc
+spec:
+  type: ClusterIP
+  ports:
+    - name: rpc
+      port: 4500
+      targetPort: 4500
+      protocol: TCP
+    - name: rpc-async
+      port: 4501
+      targetPort: 4501
+      protocol: TCP
+  selector:
+    {{- include "travelping-upf-loadtest.trex.labels" . | nindent 4 }}
+{{- end }}

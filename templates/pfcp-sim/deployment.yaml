@@ -1,0 +1,108 @@
+{{- if .Values.pfcpSim.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "travelping-upf-loadtest.fullname" . }}-pfcp-sim
+  namespace: {{ .Values.namespace.name }}
+  labels:
+    {{- include "travelping-upf-loadtest.pfcp-sim.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+    rollingUpdate: null
+  selector:
+    matchLabels:
+      {{- include "travelping-upf-loadtest.pfcp-sim.labels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "travelping-upf-loadtest.pfcp-sim.labels" . | nindent 8 }}
+      annotations:
+        qos.class: "Burstable"
+        checksum/sessions: {{ include (print $.Template.BasePath "/pfcp-sim/configmap-sessions.yaml") . | sha256sum }}
+        k8s.v1.cni.cncf.io/networks: >-
+          [{
+            "name": "{{ include "travelping-upf-loadtest.fullname" . }}-n4",
+            "interface": "{{ .Values.pfcpSim.config.interface }}"
+          }]
+    spec:
+      serviceAccountName: {{ include "travelping-upf-loadtest.serviceAccountName" . }}
+      {{- if .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml .Values.global.imagePullSecrets | nindent 8 }}
+      {{- end }}
+      nodeSelector:
+        {{- range $key, $value := .Values.pfcpSim.nodeSelector }}
+        {{ $key }}: {{ $value | quote }}
+        {{- end }}
+      containers:
+        - name: pfcp-sim
+          image: "{{ .Values.pfcpSim.image.repository }}:{{ .Values.pfcpSim.image.tag }}"
+          imagePullPolicy: {{ .Values.pfcpSim.image.pullPolicy }}
+          command: ["/usr/local/bin/pfcpsim"]
+          args:
+            - --interface
+            - "{{ .Values.pfcpSim.config.interface }}"
+            - --port
+            - "54321"
+          securityContext:
+            {{- toYaml .Values.pfcpSim.securityContext | nindent 12 }}
+          resources:
+            requests:
+              {{- toYaml .Values.pfcpSim.resources.requests | nindent 14 }}
+            limits:
+              {{- toYaml .Values.pfcpSim.resources.limits | nindent 14 }}
+          ports:
+            - name: grpc
+              containerPort: 54321
+              protocol: TCP
+            - name: pfcp
+              containerPort: 8805
+              protocol: UDP
+          livenessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - "nc -z -w 2 localhost 54321 || exit 1"
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          readinessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - "nc -z -w 2 localhost 54321 || exit 1"
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 2
+            failureThreshold: 3
+
+        - name: session-creator
+          image: "{{ .Values.pfcpSim.image.repository }}:{{ .Values.pfcpSim.image.tag }}"
+          imagePullPolicy: {{ .Values.pfcpSim.image.pullPolicy }}
+          command: ["/bin/sh", "/scripts/create-sessions.sh"]
+          securityContext:
+            runAsUser: 0
+          volumeMounts:
+            - name: pfcp-sessions
+              mountPath: /scripts
+          env:
+            - name: PFCPSIM_LOG_LEVEL
+              value: "info"
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "256Mi"
+      volumes:
+        - name: pfcp-sessions
+          configMap:
+            name: {{ include "travelping-upf-loadtest.fullname" . }}-pfcp-sessions
+            defaultMode: 0755
+{{- end }}

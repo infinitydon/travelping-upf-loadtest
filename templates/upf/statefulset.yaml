@@ -1,0 +1,154 @@
+{{- if .Values.upf.enabled }}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "travelping-upf-loadtest.fullname" . }}-upf
+  namespace: {{ .Values.namespace.name }}
+  labels:
+    {{- include "travelping-upf-loadtest.upf.labels" . | nindent 4 }}
+spec:
+  serviceName: {{ include "travelping-upf-loadtest.fullname" . }}-upf
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "travelping-upf-loadtest.upf.labels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "travelping-upf-loadtest.upf.labels" . | nindent 8 }}
+      annotations:
+        qos.class: {{ .Values.global.qosClass }}
+        checksum/entrypoint: {{ include (print $.Template.BasePath "/upf/configmap-entrypoint.yaml") . | sha256sum }}
+        checksum/init-conf: {{ include (print $.Template.BasePath "/upf/configmap-init-conf.yaml") . | sha256sum }}
+        checksum/startup-conf: {{ include (print $.Template.BasePath "/upf/configmap-startup-conf.yaml") . | sha256sum }}
+    spec:
+      serviceAccountName: {{ include "travelping-upf-loadtest.serviceAccountName" . }}
+      {{- if .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml .Values.global.imagePullSecrets | nindent 8 }}
+      {{- end }}
+      nodeSelector:
+        {{- range $key, $value := .Values.upf.nodeSelector }}
+        {{ $key }}: {{ $value | quote }}
+        {{- end }}
+      initContainers:
+        - name: verify-resources
+          image: busybox:1.36
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              echo "[INFO] Verifying VFIO devices..."
+              ls -la /dev/vfio/
+              echo "[INFO] Verifying hugepages..."
+              cat /proc/meminfo | grep -i huge
+              echo "[INFO] Verifying CPU allocation..."
+              cat /proc/self/status | grep -E 'Cpus_allowed|Cpus_allowed_list'
+              echo "[INFO] Resource verification complete"
+          securityContext:
+            privileged: true
+          volumeMounts:
+            - name: dev-vfio
+              mountPath: /dev/vfio
+            - name: hugepages
+              mountPath: /mnt/huge
+      containers:
+        - name: upf
+          image: "{{ .Values.upf.image.repository }}:{{ .Values.upf.image.tag }}"
+          imagePullPolicy: {{ .Values.upf.image.pullPolicy }}
+          command: ["/bin/bash", "/entrypoint/entrypoint.sh"]
+          securityContext:
+            privileged: true
+            capabilities:
+              add:
+                - NET_ADMIN
+                - SYS_RESOURCE
+                - IPC_LOCK
+                - SYS_NICE
+            runAsUser: 0
+          resources:
+            requests:
+              {{- toYaml .Values.upf.resources.requests | nindent 14 }}
+            limits:
+              {{- toYaml .Values.upf.resources.limits | nindent 14 }}
+          env:
+            - name: VPP_LOG_LEVEL
+              value: {{ .Values.upf.vpp.logLevel }}
+            - name: SSL_CERT_FILE
+              value: /etc/ssl/certs/ca-certificates.crt
+            - name: SSL_CERT_DIR
+              value: /etc/ssl/certs
+          volumeMounts:
+            - name: startup-conf
+              mountPath: /etc/vpp/startup.conf.template
+              subPath: startup.conf
+            - name: init-conf
+              mountPath: /etc/vpp/init.conf
+              subPath: init.conf
+            - name: entrypoint
+              mountPath: /entrypoint
+            - name: dev-vfio
+              mountPath: /dev/vfio
+            - name: hugepages
+              mountPath: /mnt/huge
+            - name: vpp-run
+              mountPath: /run/vpp
+            - name: vpp-log
+              mountPath: /var/log/vpp
+            - name: ssl-certs
+              mountPath: /etc/ssl/certs
+              readOnly: true
+          livenessProbe:
+            exec:
+              command:
+                - vppctl
+                - -s
+                - /run/vpp/cli.sock
+                - show version
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            exec:
+              command:
+                - vppctl
+                - -s
+                - /run/vpp/cli.sock
+                - show interface
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+      volumes:
+        - name: startup-conf
+          configMap:
+            name: {{ include "travelping-upf-loadtest.fullname" . }}-upf-startup-conf
+            items:
+              - key: startup.conf
+                path: startup.conf
+        - name: init-conf
+          configMap:
+            name: {{ include "travelping-upf-loadtest.fullname" . }}-upf-init-conf
+            items:
+              - key: init.conf
+                path: init.conf
+        - name: entrypoint
+          configMap:
+            name: {{ include "travelping-upf-loadtest.fullname" . }}-upf-entrypoint
+            defaultMode: 0755
+        - name: dev-vfio
+          hostPath:
+            path: /dev/vfio
+            type: Directory
+        - name: hugepages
+          emptyDir:
+            medium: HugePages
+        - name: vpp-run
+          emptyDir: {}
+        - name: vpp-log
+          emptyDir: {}
+        - name: ssl-certs
+          hostPath:
+            path: /etc/ssl/certs
+            type: Directory
+{{- end }}

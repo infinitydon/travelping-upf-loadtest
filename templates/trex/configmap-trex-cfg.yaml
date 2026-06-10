@@ -1,0 +1,23 @@
+{{- if .Values.trex.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "travelping-upf-loadtest.fullname" . }}-trex-cfg
+  namespace: {{ .Values.namespace.name }}
+  labels:
+    {{- include "travelping-upf-loadtest.trex.labels" . | nindent 4 }}
+data:
+  trex_cfg.yaml: |
+    - port_limit    : {{ .Values.trex.config.portLimit }}
+      version       : 2
+      c             : {{ .Values.trex.config.cores }}
+      interfaces    : 
+      {{- range $name, $iface := .Values.trex.interfaces }}
+        - "{{ $iface.pciAddress }}"
+      {{- end }}
+      port_info     :
+      {{- range $iface := .Values.trex.config.portInfo }}
+        - ip         : {{ $iface.ip }}
+          default_gw : {{ $iface.defaultGw }}
+      {{- end }}
+{{- end }}

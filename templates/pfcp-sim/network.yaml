@@ -1,0 +1,76 @@
+{{- if .Values.pfcpSim.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "travelping-upf-loadtest.fullname" . }}-n4-bind
+  namespace: {{ .Values.namespace.name }}
+  labels:
+    {{- include "travelping-upf-loadtest.pfcp-sim.labels" . | nindent 4 }}
+  annotations:
+    helm.sh/hook: pre-install,pre-upgrade
+    helm.sh/hook-weight: "-10"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 2
+  template:
+    metadata:
+      labels:
+        {{- include "travelping-upf-loadtest.pfcp-sim.labels" . | nindent 8 }}
+    spec:
+      restartPolicy: OnFailure
+      nodeSelector:
+        {{- toYaml .Values.pfcpSim.nodeSelector | nindent 8 }}
+      containers:
+        - name: bind-kernel-driver
+          image: ubuntu:22.04
+          securityContext:
+            privileged: true
+          command: ["/bin/bash", "-ceu"]
+          args:
+            - |
+              pci="{{ .Values.pfcpSim.config.pciAddress }}"
+              driver="{{ .Values.pfcpSim.config.kernelDriver }}"
+              device="/host/sys/bus/pci/devices/${pci}"
+              current="$(basename "$(readlink -f "${device}/driver" 2>/dev/null || true)")"
+              if [ "${current}" = "${driver}" ]; then
+                exit 0
+              fi
+              if [ -n "${current}" ]; then
+                echo "${pci}" > "${device}/driver/unbind"
+              fi
+              echo "${driver}" > "${device}/driver_override"
+              echo "${pci}" > /host/sys/bus/pci/drivers_probe
+              test "$(basename "$(readlink -f "${device}/driver")")" = "${driver}"
+          volumeMounts:
+            - name: host-sys
+              mountPath: /host/sys
+      volumes:
+        - name: host-sys
+          hostPath:
+            path: /sys
+            type: Directory
+---
+apiVersion: k8s.cni.cncf.io/v1
+kind: NetworkAttachmentDefinition
+metadata:
+  name: {{ include "travelping-upf-loadtest.fullname" . }}-n4
+  namespace: {{ .Values.namespace.name }}
+  labels:
+    {{- include "travelping-upf-loadtest.pfcp-sim.labels" . | nindent 4 }}
+spec:
+  config: |-
+    {
+      "cniVersion": "0.3.1",
+      "name": "{{ include "travelping-upf-loadtest.fullname" . }}-n4",
+      "type": "host-device",
+      "pciBusID": "{{ .Values.pfcpSim.config.pciAddress }}",
+      "ipam": {
+        "type": "static",
+        "addresses": [
+          {
+            "address": "{{ .Values.pfcpSim.config.localIp }}/24"
+          }
+        ]
+      }
+    }
+{{- end }}

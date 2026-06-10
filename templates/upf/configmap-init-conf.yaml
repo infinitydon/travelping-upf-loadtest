@@ -1,0 +1,49 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "travelping-upf-loadtest.fullname" . }}-upf-init-conf
+  namespace: {{ .Values.namespace.name }}
+  labels:
+    {{- include "travelping-upf-loadtest.upf.labels" . | nindent 4 }}
+data:
+  init.conf: |
+    # VPP runtime configuration for Travelping UPF
+    # This is executed after VPP starts via 'exec /etc/vpp/init.conf' in startup.conf
+
+    # VPP requires non-default FIB tables to exist before interfaces use them.
+    {{- range $name, $nwi := .Values.upf.nwi }}
+    {{- if ne (int $nwi.vrf) 0 }}
+    ip table add {{ $nwi.vrf }}
+    {{- end }}
+    {{- end }}
+
+    # Interface configuration
+    {{- range $name, $iface := .Values.upf.interfaces }}
+    set interface ip table {{ $iface.name }} {{ $iface.vrf }}
+    set interface mtu {{ $iface.mtu }} {{ $iface.name }}
+    set interface ip address {{ $iface.name }} {{ $iface.ip }}
+    set interface state {{ $iface.name }} up
+    {{- end }}
+
+    # Routing configuration
+    {{- range $route := .Values.upf.routes }}
+    ip route add {{ $route.dst }} table {{ $route.table }} via {{ $route.via }} {{ $route.dev }}
+    {{- end }}
+
+    # UPF PFCP endpoint
+    upf pfcp endpoint ip {{ .Values.upf.pfcp.endpointIp }} vrf {{ .Values.upf.pfcp.vrf }}
+
+    # Network Instances (NWI)
+    {{- range $name, $nwi := .Values.upf.nwi }}
+    upf nwi name {{ $nwi.name }} intf {{ if eq $name "access" }}access{{ else }}core{{ end }} vrf {{ $nwi.vrf }}
+    {{- end }}
+
+    # GTP-U endpoint
+    upf gtpu endpoint ip {{ .Values.upf.gtp.endpointIp }} intf access nwi {{ .Values.upf.gtp.nwi }} teid {{ .Values.upf.gtp.teidRange }}
+    upf pfcp heartbeat-config timeout 120 retries 10
+
+    # Show configuration
+    show interface
+    show ip fib
+    show upf nwi
+    show upf pfcp endpoint

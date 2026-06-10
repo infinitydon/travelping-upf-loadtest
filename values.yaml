@@ -1,0 +1,307 @@
+# Default values for travelping-upf-loadtest
+# Load testing setup for Travelping UPF with Cisco TRex and PFCP simulator
+
+global:
+  targetNode: "ebpf-bng-node-01"
+  namespace: "upf-loadtest"
+  qosClass: "Guaranteed"
+  imagePullSecrets:
+    - name: github-registry
+
+# UPF Configuration (Travelping UPG-VPP)
+upf:
+  enabled: true
+  image:
+    repository: "quay.io/travelping/upg-vpp"
+    tag: "v2.0.0_release"
+    pullPolicy: IfNotPresent
+  
+  # Named interfaces for UPF (n3=access, n4=pfcp, n6=internet)
+  # PCI addresses map to VFIO-bound devices on the node
+  interfaces:
+    n3:
+      name: "n3"
+      pciAddress: "0000:00:15.0"
+      ip: "10.0.3.10/24"
+      gateway: "10.0.3.1"
+      mtu: 9001
+      vrf: 1
+    n4:
+      name: "n4"
+      pciAddress: "0000:00:16.0"
+      ip: "10.0.4.9/24"
+      gateway: ""
+      mtu: 9001
+      vrf: 0
+    n6:
+      name: "n6"
+      pciAddress: "0000:00:17.0"
+      ip: "10.0.5.9/24"
+      gateway: "10.0.5.1"
+      mtu: 9001
+      vrf: 2
+
+  # CPU configuration - auto-detected from cgroup Cpus_allowed_list
+  # Entryoint script will use all allocated cores (first = main, rest = workers)
+  cpu:
+    policy: "dedicated"
+    mainCore: 2
+    workerCores: "3-4"
+
+  # Hugepages configuration
+  hugepages:
+    size: "1Gi"
+    count: 3
+
+  # VPP startup configuration
+  vpp:
+    logLevel: "info"
+    cliListen: "/run/vpp/cli.sock"
+    apiTrace: true
+    plugins:
+      dpdk_plugin: true
+      gtpu_plugin: false
+      upf_plugin: true
+
+  # UPF PFCP configuration
+  pfcp:
+    endpointIp: "10.0.4.9"
+    endpointPort: 8805
+    vrf: 0
+
+  # UPF Network Instance configuration
+  nwi:
+    access:
+      name: "access"
+      vrf: 1
+    internet:
+      name: "internet"
+      vrf: 2
+
+  # GTP-U endpoint
+  gtp:
+    endpointIp: "10.0.3.10"
+    nwi: "access"
+    teidRange: "0x000004d2/2"
+
+  # Routing configuration
+  routes:
+    - table: 1
+      dst: "0.0.0.0/0"
+      via: "10.0.3.1"
+      dev: "n3"
+    - table: 2
+      dst: "0.0.0.0/0"
+      via: "10.0.5.1"
+      dev: "n6"
+
+  # Resource limits (Guaranteed QoS)
+  resources:
+    requests:
+      cpu: "3"
+      memory: "4Gi"
+      hugepages-1Gi: "3Gi"
+    limits:
+      cpu: "3"
+      memory: "4Gi"
+      hugepages-1Gi: "3Gi"
+
+  # Security context
+  securityContext:
+    privileged: true
+    capabilities:
+      add:
+        - NET_ADMIN
+        - SYS_RESOURCE
+        - IPC_LOCK
+        - SYS_NICE
+    runAsUser: 0
+
+  # Node selector
+  nodeSelector:
+    kubernetes.io/hostname: "ebpf-bng-node-01"
+
+# TRex Configuration (Cisco TRex Traffic Generator)
+trex:
+  enabled: true
+  image:
+    repository: "eisai/cisco-trex"
+    tag: "v3.06"
+    pullPolicy: IfNotPresent
+
+  # TRex interfaces (2 ports: port 0 -> N3, port 1 -> N6)
+  interfaces:
+    port0:
+      pciAddress: "0000:01:01.0"
+      ip: "10.0.3.1/24"
+      gateway: "10.0.3.10"
+    port1:
+      pciAddress: "0000:01:02.0"
+      ip: "10.0.5.1/24"
+      gateway: "10.0.5.9"
+
+  # CPU configuration
+  cpu:
+    cores: 1
+    policy: "dedicated"
+
+  # Hugepages
+  hugepages:
+    size: "1Gi"
+    count: 2
+
+  # TRex config
+  config:
+    portLimit: 2
+    cores: 1
+    portInfo:
+      - ip: "10.0.3.1"
+        defaultGw: "10.0.3.10"
+      - ip: "10.0.5.1"
+        defaultGw: "10.0.5.9"
+
+  test:
+    enabled: true
+    startDelaySeconds: 5
+    duration: 15
+    pps: 100000
+    profile: "/opt/trex/scripts/gtpu_uplink.py"
+
+  # Resource limits (Guaranteed QoS)
+  resources:
+    requests:
+      cpu: "3"
+      memory: "2Gi"
+      hugepages-1Gi: "2Gi"
+    limits:
+      cpu: "3"
+      memory: "2Gi"
+      hugepages-1Gi: "2Gi"
+
+  # Security context
+  securityContext:
+    privileged: true
+    capabilities:
+      add:
+        - NET_ADMIN
+        - SYS_RESOURCE
+        - IPC_LOCK
+        - SYS_NICE
+    runAsUser: 0
+
+  # Node selector
+  nodeSelector:
+    kubernetes.io/hostname: "ebpf-bng-node-01"
+
+# PFCP Simulator Configuration
+pfcpSim:
+  enabled: true
+  image:
+    repository: "ghcr.io/infinitydon/pfcpsim-travelping"
+    tag: "v1.4.4-7"
+    pullPolicy: IfNotPresent
+
+  # PFCP simulator configuration
+  config:
+    upfIp: "10.0.4.9"
+    upfPort: 8805
+    localIp: "10.0.4.1"
+    localPort: 8805
+    interface: "n4"
+    pciAddress: "0000:01:03.0"
+    kernelDriver: "virtio-pci"
+    sessionCount: 1000
+    sessionTemplate:
+      imsi: "999700000000001"
+      msisdn: "1234567890"
+      apn: "internet"
+      ipv4: "48.0.0.0/8"
+      qos:
+        qfi: 9
+        arp: 1
+        gbrUl: 0
+        gbrDl: 0
+        mbrUl: "1000000000"
+        mbrDl: "1000000000"
+
+  # Resource limits (Burstable QoS)
+  resources:
+    requests:
+      cpu: "500m"
+      memory: "512Mi"
+    limits:
+      cpu: "1000m"
+      memory: "1Gi"
+
+  # Security context
+  securityContext:
+    runAsUser: 0
+    capabilities:
+      add:
+        - NET_ADMIN
+
+  # Node selector
+  nodeSelector:
+    kubernetes.io/hostname: "ebpf-bng-node-01"
+
+# Monitoring Configuration
+monitoring:
+  enabled: false
+  prometheus:
+    enabled: true
+    port: 9090
+  grafana:
+    enabled: false
+  serviceMonitor:
+    enabled: false
+    interval: 15s
+    scrapeTimeout: 10s
+
+# Test orchestration
+testOrchestration:
+  enabled: true
+  phases:
+    - name: "baseline"
+      description: "Baseline throughput test"
+      trexProfile: "astf-tcp-bidirectional"
+      duration: 60
+      warmup: 10
+    - name: "ramp-up"
+      description: "Gradual load increase"
+      trexProfile: "stl-udp-high-pps"
+      duration: 300
+      ppsSteps: [100000, 500000, 1000000, 2000000, 5000000, 10000000]
+      stepDuration: 30
+    - name: "max-pps"
+      description: "Maximum PPS test"
+      trexProfile: "stl-udp-high-pps"
+      duration: 120
+      pps: "auto"
+    - name: "latency"
+      description: "Latency under load"
+      trexProfile: "astf-tcp-bidirectional"
+      duration: 60
+      multiplier: "80%"
+    - name: "long-run"
+      description: "Stability test"
+      trexProfile: "stl-imix"
+      duration: 1800
+      multiplier: "50%"
+
+  results:
+    outputDir: "/results"
+    format: "json"
+    uploadTo: ""
+
+# RBAC
+rbac:
+  create: true
+  serviceAccountName: "upf-loadtest-sa"
+
+# Namespace
+namespace:
+  create: true
+  name: "upf-loadtest"
+  labels:
+    app: "upf-loadtest"
+    environment: "test"

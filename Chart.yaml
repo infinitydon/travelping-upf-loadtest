@@ -1,0 +1,24 @@
+apiVersion: v2
+name: travelping-upf-loadtest
+description: Helm chart for Travelping UPF load testing with Cisco TRex and PFCP simulator
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+keywords:
+  - 5g
+  - upf
+  - load-test
+  - trex
+  - pfcp
+  - travelping
+maintainers:
+  - name: infinitydon
+    url: https://github.com/infinitydon
+home: https://github.com/infinitydon/travelping-upf-loadtest
+sources:
+  - https://github.com/infinitydon/travelping-upf-loadtest
+  - https://github.com/infinitydon/pfcpsim-travelping
+  - https://github.com/travelping/upg-vpp
+  - https://github.com/cisco-system-traffic-generator/trex-core
+annotations:
+  artifacthub.io/license: Apache-2.0

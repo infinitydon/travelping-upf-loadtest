@@ -1,0 +1,84 @@
+{{/*
+Expand the name of the chart.
+*/}}
+{{- define "travelping-upf-loadtest.name" -}}
+{{- default .Chart.Name .Values.nameOverride | trunc 63 | trimSuffix "-" }}
+{{- end }}
+
+{{/*
+Create a default fully qualified app name.
+*/}}
+{{- define "travelping-upf-loadtest.fullname" -}}
+{{- if .Values.fullnameOverride }}
+{{- .Values.fullnameOverride | trunc 63 | trimSuffix "-" }}
+{{- else }}
+{{- $name := default .Chart.Name .Values.nameOverride }}
+{{- if contains $name .Release.Name }}
+{{- .Release.Name | trunc 63 | trimSuffix "-" }}
+{{- else }}
+{{- printf "%s-%s" .Release.Name $name | trunc 63 | trimSuffix "-" }}
+{{- end }}
+{{- end }}
+{{- end }}
+
+{{/*
+Create chart name and version as used by the chart label.
+*/}}
+{{- define "travelping-upf-loadtest.chart" -}}
+{{- printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | trunc 63 | trimSuffix "-" }}
+{{- end }}
+
+{{/*
+Common labels
+*/}}
+{{- define "travelping-upf-loadtest.labels" -}}
+helm.sh/chart: {{ include "travelping-upf-loadtest.chart" . }}
+{{ include "travelping-upf-loadtest.selectorLabels" . }}
+{{- if .Chart.AppVersion }}
+app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
+{{- end }}
+app.kubernetes.io/managed-by: {{ .Release.Service }}
+{{- end }}
+
+{{/*
+Selector labels
+*/}}
+{{- define "travelping-upf-loadtest.selectorLabels" -}}
+app.kubernetes.io/name: {{ include "travelping-upf-loadtest.name" . }}
+app.kubernetes.io/instance: {{ .Release.Name }}
+{{- end }}
+
+{{/*
+Create the name of the service account to use
+*/}}
+{{- define "travelping-upf-loadtest.serviceAccountName" -}}
+{{- if .Values.rbac.serviceAccountName }}
+{{- .Values.rbac.serviceAccountName }}
+{{- else }}
+{{- default "default" .Values.serviceAccountName }}
+{{- end }}
+{{- end }}
+
+{{/*
+UPF labels
+*/}}
+{{- define "travelping-upf-loadtest.upf.labels" -}}
+{{- include "travelping-upf-loadtest.labels" . }}
+component: upf
+{{- end }}
+
+{{/*
+TRex labels
+*/}}
+{{- define "travelping-upf-loadtest.trex.labels" -}}
+{{- include "travelping-upf-loadtest.labels" . }}
+component: trex
+{{- end }}
+
+{{/*
+PFCP Sim labels
+*/}}
+{{- define "travelping-upf-loadtest.pfcp-sim.labels" -}}
+{{- include "travelping-upf-loadtest.labels" . }}
+component: pfcp-sim
+{{- end }}

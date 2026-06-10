@@ -1,0 +1,47 @@
+name: Publish Helm chart
+
+on:
+  push:
+    tags:
+      - "chart-v*"
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+
+      - name: Validate chart version
+        shell: bash
+        run: |
+          set -euo pipefail
+          chart_version="$(helm show chart . | awk '$1 == "version:" {print $2}')"
+          tag_version="${GITHUB_REF_NAME#chart-v}"
+          test "$chart_version" = "$tag_version"
+
+      - name: Lint and package
+        shell: bash
+        run: |
+          set -euo pipefail
+          helm lint .
+          helm package . --destination dist
+
+      - name: Log in to GHCR
+        shell: bash
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" |
+            helm registry login ghcr.io \
+              --username "${{ github.actor }}" \
+              --password-stdin
+
+      - name: Publish chart
+        shell: bash
+        run: helm push dist/*.tgz oci://ghcr.io/${{ github.repository_owner }}

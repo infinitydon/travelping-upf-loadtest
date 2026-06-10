@@ -1,0 +1,80 @@
+{{- if .Values.pfcpSim.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "travelping-upf-loadtest.fullname" . }}-pfcp-sessions
+  namespace: {{ .Values.namespace.name }}
+  labels:
+    {{- include "travelping-upf-loadtest.pfcp-sim.labels" . | nindent 4 }}
+data:
+  # Session creation script for pfcpctl
+  create-sessions.sh: |
+    #!/bin/sh
+    set -e
+
+    PFCP_SIM_HOST="localhost"
+    PFCP_SIM_PORT="54321"
+    UPF_N3_IP="{{ index (splitList "/" .Values.upf.interfaces.n3.ip) 0 }}"
+    GNB_N3_IP="{{ index (splitList "/" .Values.trex.interfaces.port0.ip) 0 }}"
+    UPF_PFCP_IP="{{ .Values.upf.pfcp.endpointIp }}"
+    UPF_PFCP_PORT="{{ .Values.upf.pfcp.endpointPort }}"
+    SESSION_COUNT="{{ .Values.pfcpSim.config.sessionCount }}"
+    UE_POOL="{{ .Values.pfcpSim.config.sessionTemplate.ipv4 }}"
+    QFI="{{ .Values.pfcpSim.config.sessionTemplate.qos.qfi }}"
+    BASE_ID=1
+
+    echo "[INFO] Waiting for PFCP Sim gRPC server at ${PFCP_SIM_HOST}:${PFCP_SIM_PORT}..."
+    for i in $(seq 1 30); do
+      if nc -z -w 2 ${PFCP_SIM_HOST} ${PFCP_SIM_PORT} 2>/dev/null; then
+        echo "[INFO] PFCP Sim is ready"
+        break
+      fi
+      echo "[INFO] Waiting... (attempt $i/30)"
+      sleep 2
+    done
+
+    if ! nc -z -w 2 ${PFCP_SIM_HOST} ${PFCP_SIM_PORT} 2>/dev/null; then
+      echo "[ERROR] PFCP Sim did not become ready in time"
+      exit 1
+    fi
+
+    echo "[INFO] Configuring and associating PFCP Sim..."
+    for i in $(seq 1 60); do
+      if pfcpctl -s "${PFCP_SIM_HOST}:${PFCP_SIM_PORT}" service configure \
+          --n3-addr "${UPF_N3_IP}" \
+          --remote-peer-addr "${UPF_PFCP_IP}:${UPF_PFCP_PORT}" &&
+         pfcpctl -s "${PFCP_SIM_HOST}:${PFCP_SIM_PORT}" service associate; then
+        break
+      fi
+      if [ "$i" -eq 60 ]; then
+        echo "[ERROR] PFCP association failed"
+        exit 1
+      fi
+      sleep 2
+    done
+
+    echo "[INFO] Creating ${SESSION_COUNT} PFCP sessions..."
+    pfcpctl -s "${PFCP_SIM_HOST}:${PFCP_SIM_PORT}" session create \
+      --count ${SESSION_COUNT} \
+      --baseID ${BASE_ID} \
+      --gnb-addr "${GNB_N3_IP}" \
+      --ue-pool "${UE_POOL}" \
+      --qfi ${QFI}
+
+    echo "[INFO] Session creation complete"
+    exec sleep infinity
+  # PFCP simulator config (for reference)
+  pfcp_config.yaml: |
+    upf:
+      ip: "{{ .Values.pfcpSim.config.upfIp }}"
+      port: {{ .Values.pfcpSim.config.upfPort }}
+    local:
+      ip: "{{ .Values.pfcpSim.config.localIp }}"
+      port: {{ .Values.pfcpSim.config.localPort }}
+    node_id:
+      type: 0  # IP address
+      value: "{{ .Values.pfcpSim.config.localIp }}"
+    heartbeat_interval: 10
+    max_retries: 3
+    retry_interval: 5
+{{- end }}

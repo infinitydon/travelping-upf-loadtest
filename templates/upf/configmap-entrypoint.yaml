@@ -1,0 +1,61 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "travelping-upf-loadtest.fullname" . }}-upf-entrypoint
+  namespace: {{ .Values.namespace.name }}
+  labels:
+    {{- include "travelping-upf-loadtest.upf.labels" . | nindent 4 }}
+data:
+  entrypoint.sh: |
+    #!/bin/bash
+    set -e
+
+    echo "[INFO] Copying startup config template..."
+    cp /etc/vpp/startup.conf.template /etc/vpp/startup.conf
+
+    # This cluster uses CFS CPU quotas rather than static cpusets, so explicit
+    # VPP pinning is required to avoid consuming every online CPU.
+    mainCore="{{ .Values.upf.cpu.mainCore }}"
+    workerCore="{{ .Values.upf.cpu.workerCores }}"
+
+    echo "[INFO] Using mainCore=$mainCore and workerCore=$workerCore"
+
+    # Replace placeholders in startup.conf
+    sed -i "s/CORE1/$mainCore/g" /etc/vpp/startup.conf
+    if [ -n "$workerCore" ]; then
+      sed -i "s/CORE2/$workerCore/g" /etc/vpp/startup.conf
+    else
+      sed -i "/corelist-workers CORE2/d" /etc/vpp/startup.conf
+    fi
+
+    # Verify the config
+    echo "[INFO] Final startup.conf:"
+    cat /etc/vpp/startup.conf
+
+    # Fix for issue #306: Ensure CA certificates are available
+    echo "[INFO] Setting up TLS CA certificates..."
+    if [ -f /etc/ssl/certs/ca-certificates.crt ]; then
+      export SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
+      export SSL_CERT_DIR=/etc/ssl/certs
+      echo "[INFO] CA certificates found at $SSL_CERT_FILE"
+    else
+      echo "[WARN] CA certificates not found, installing..."
+      apt-get update && apt-get install -y ca-certificates 2>/dev/null || true
+    fi
+
+    # Ensure log directory exists
+    mkdir -p /var/log/vpp
+    touch /var/log/vpp/vpp.log
+    chown vpp:vpp /var/log/vpp/vpp.log 2>/dev/null || true
+
+    # Set up hugepages
+    echo "[INFO] Checking hugepages..."
+    hugepages_1g=$(grep HugePages_Total /proc/meminfo | awk '{print $2}')
+    echo "[INFO] Available 1G hugepages: $hugepages_1g"
+
+    # Preload libhs to fix IFUNC symbol issue (issue #306)
+    echo "[INFO] Preloading libhs..."
+    export LD_PRELOAD=/lib/x86_64-linux-gnu/libhs.so.5
+
+    echo "[INFO] Starting VPP..."
+    exec vpp -c /etc/vpp/startup.conf

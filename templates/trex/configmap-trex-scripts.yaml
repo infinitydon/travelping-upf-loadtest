@@ -1,0 +1,111 @@
+{{- if .Values.trex.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "travelping-upf-loadtest.fullname" . }}-trex-scripts
+  namespace: {{ .Values.namespace.name }}
+  labels:
+    {{- include "travelping-upf-loadtest.trex.labels" . | nindent 4 }}
+data:
+  gtpu_uplink.py: |
+    from trex.stl.api import *
+    from scapy.contrib.gtp import GTP_U_Header
+
+    class GTPUUplink:
+        def get_streams(self, **kwargs):
+            # pfcpsim allocates UE addresses sequentially and uplink TEIDs in
+            # steps of 10, starting with UE 48.0.0.1 and TEID 1.
+            packet = (
+                Ether()
+                / IP(src="10.0.3.1", dst="10.0.3.10")
+                / UDP(sport=2152, dport=2152, chksum=0)
+                / GTP_U_Header(teid=1)
+                / IP(src="48.0.0.1", dst="10.0.5.1")
+                / UDP(sport=1024, dport=9, chksum=0)
+                / Raw(load=b"x" * 18)
+            )
+
+            vm = STLVM()
+            vm.var(
+                name="ue_ip",
+                min_value="48.0.0.1",
+                max_value="48.0.3.232",
+                size=4,
+                step=1,
+                op="inc",
+            )
+            vm.var(
+                name="teid",
+                min_value=1,
+                max_value=9991,
+                size=4,
+                step=10,
+                op="inc",
+            )
+            vm.write(fv_name="teid", pkt_offset=46)
+            vm.write(fv_name="ue_ip", pkt_offset="IP:1.src")
+            vm.fix_chksum(offset="IP:1")
+
+            return [
+                STLStream(
+                    packet=STLPktBuilder(pkt=packet, vm=vm),
+                    mode=STLTXCont(pps=1),
+                )
+            ]
+
+    def register():
+        return GTPUUplink()
+
+  run_test.py: |
+    #!/usr/bin/env python3
+    import argparse
+    import json
+    import time
+
+    from trex.stl.api import STLClient, STLProfile
+
+    def main():
+        parser = argparse.ArgumentParser()
+        parser.add_argument("--server", default="localhost")
+        parser.add_argument("--profile", required=True)
+        parser.add_argument("--duration", type=int, required=True)
+        parser.add_argument("--pps", type=int, required=True)
+        parser.add_argument("--output", default="/results/gtpu-uplink.json")
+        args = parser.parse_args()
+
+        client = STLClient(server=args.server)
+        try:
+            client.connect()
+            client.acquire(ports=[0, 1], force=True)
+            client.reset(ports=[0, 1])
+            profile = STLProfile.load_py(args.profile)
+            client.add_streams(profile.get_streams(), ports=[0])
+            client.clear_stats()
+            client.start(ports=[0], mult=f"{args.pps}pps", duration=args.duration)
+            client.wait_on_traffic(ports=[0])
+            stats = client.get_stats()
+
+            tx = stats[0]["opackets"]
+            rx = stats[1]["ipackets"]
+            loss = max(tx - rx, 0)
+            result = {
+                "timestamp": time.time(),
+                "requested_pps": args.pps,
+                "duration_seconds": args.duration,
+                "tx_packets": tx,
+                "rx_packets": rx,
+                "lost_packets": loss,
+                "loss_percent": (loss * 100.0 / tx) if tx else 100.0,
+            }
+            with open(args.output, "w") as output:
+                json.dump(result, output, indent=2)
+            print(json.dumps(result, indent=2))
+            if tx == 0 or rx == 0:
+                raise SystemExit("no end-to-end UPF traffic received")
+        finally:
+            if client.is_connected():
+                client.disconnect()
+
+    if __name__ == "__main__":
+        main()
+{{- end }}

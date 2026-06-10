@@ -1,0 +1,98 @@
+{{- if .Values.monitoring.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "travelping-upf-loadtest.fullname" . }}-prometheus-rules
+  namespace: {{ .Values.namespace.name }}
+  labels:
+    {{- include "travelping-upf-loadtest.labels" . | nindent 4 }}
+    prometheus: "rules"
+data:
+  upf-loadtest.rules.yml: |
+    groups:
+      - name: upf-loadtest.rules
+        rules:
+          # UPF alerts
+          - alert: UPFDown
+            expr: up{job=~".*upf.*"} == 0
+            for: 1m
+            labels:
+              severity: critical
+            annotations:
+              summary: "UPF instance {{ `$labels.instance` }} is down"
+              description: "UPF has been down for more than 1 minute"
+
+          - alert: UPFHighPacketLoss
+            expr: |
+              (
+                rate(vpp_interface_rx_packets_total[5m]) - rate(vpp_interface_tx_packets_total[5m])
+              ) / rate(vpp_interface_rx_packets_total[5m]) > 0.01
+            for: 2m
+            labels:
+              severity: warning
+            annotations:
+              summary: "High packet loss on UPF interface {{ `$labels.interface` }}"
+              description: "Packet loss > 1% on {{ `$labels.interface` }}"
+
+          - alert: UPFHighCPU
+            expr: |
+              rate(vpp_cpu_cycles_total[5m]) / 1e9 > 0.9
+            for: 5m
+            labels:
+              severity: warning
+            annotations:
+              summary: "UPF CPU utilization > 90%"
+              description: "UPF main/core CPU is over 90% utilized"
+
+          # TRex alerts
+          - alert: TRexDown
+            expr: up{job=~".*trex.*"} == 0
+            for: 1m
+            labels:
+              severity: critical
+            annotations:
+              summary: "TRex instance {{ `$labels.instance` }} is down"
+
+          - alert: TRexHighLoss
+            expr: |
+              (
+                trex_port_opackets_total - trex_port_ipackets_total
+              ) / trex_port_opackets_total > 0.05
+            for: 1m
+            labels:
+              severity: warning
+            annotations:
+              summary: "TRex port {{ `$labels.port` }} has > 5% packet loss"
+              description: "Loss rate: {{ `$value | humanizePercentage` }}"
+
+          # PFCP Sim alerts
+          - alert: PFCPSimDown
+            expr: up{job=~".*pfcp-sim.*"} == 0
+            for: 1m
+            labels:
+              severity: critical
+            annotations:
+              summary: "PFCP Simulator is down"
+              description: "PFCP Simulator has been down for more than 1 minute"
+
+          - alert: PFCPSessionFailures
+            expr: |
+              increase(pfcp_session_failed_total[5m]) > 10
+            for: 1m
+            labels:
+              severity: warning
+            annotations:
+              summary: "High PFCP session failure rate"
+              description: "{{ `$value` }} session failures in last 5 minutes"
+
+          # Test result alerts
+          - alert: LoadTestMaxPPSBelowThreshold
+            expr: |
+              loadtest_max_pps < 1000000
+            for: 0m
+            labels:
+              severity: warning
+            annotations:
+              summary: "Maximum PPS below threshold"
+              description: "Max PPS achieved: {{ `$value` }}, expected > 1M pps"
+{{- end }}

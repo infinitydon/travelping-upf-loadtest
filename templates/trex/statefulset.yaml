@@ -1,0 +1,184 @@
+{{- if .Values.trex.enabled }}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "travelping-upf-loadtest.fullname" . }}-trex
+  namespace: {{ .Values.namespace.name }}
+  labels:
+    {{- include "travelping-upf-loadtest.trex.labels" . | nindent 4 }}
+spec:
+  serviceName: {{ include "travelping-upf-loadtest.fullname" . }}-trex
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "travelping-upf-loadtest.trex.labels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "travelping-upf-loadtest.trex.labels" . | nindent 8 }}
+      annotations:
+        qos.class: {{ .Values.global.qosClass }}
+        cpu-policy: {{ .Values.trex.cpu.policy }}
+        checksum/config: {{ include (print $.Template.BasePath "/trex/configmap-trex-cfg.yaml") . | sha256sum }}
+        checksum/scripts: {{ include (print $.Template.BasePath "/trex/configmap-trex-scripts.yaml") . | sha256sum }}
+    spec:
+      serviceAccountName: {{ include "travelping-upf-loadtest.serviceAccountName" . }}
+      {{- if .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml .Values.global.imagePullSecrets | nindent 8 }}
+      {{- end }}
+      nodeSelector:
+        {{- range $key, $value := .Values.trex.nodeSelector }}
+        {{ $key }}: {{ $value | quote }}
+        {{- end }}
+      initContainers:
+        - name: verify-resources
+          image: busybox:1.36
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              echo "[INFO] Verifying VFIO devices for TRex..."
+              ls -la /dev/vfio/
+              echo "[INFO] Verifying hugepages..."
+              cat /proc/meminfo | grep -i huge
+              echo "[INFO] Verifying CPU allocation..."
+              cat /proc/self/status | grep -E 'Cpus_allowed|Cpus_allowed_list'
+              echo "[INFO] Resource verification complete"
+          securityContext:
+            privileged: true
+          volumeMounts:
+            - name: dev-vfio
+              mountPath: /dev/vfio
+            - name: hugepages
+              mountPath: /mnt/huge
+      containers:
+        - name: trex-server
+          image: "{{ .Values.trex.image.repository }}:{{ .Values.trex.image.tag }}"
+          imagePullPolicy: {{ .Values.trex.image.pullPolicy }}
+          command: ["/bin/bash", "-c"]
+          args:
+            - |
+              echo "[INFO] Starting TRex server..."
+              cp /etc/trex/trex_cfg.yaml /etc/trex_cfg.yaml
+              cd /opt/trex/v3.06
+              exec ./t-rex-64 -i --stl --cfg /etc/trex_cfg.yaml \
+                --prefix $(hostname) \
+                --no-hw-flow-stat \
+                --mbuf-factor 2
+          securityContext:
+            privileged: true
+            capabilities:
+              add:
+                - NET_ADMIN
+                - SYS_RESOURCE
+                - IPC_LOCK
+                - SYS_NICE
+            runAsUser: 0
+          resources:
+            requests:
+              {{- toYaml .Values.trex.resources.requests | nindent 14 }}
+            limits:
+              {{- toYaml .Values.trex.resources.limits | nindent 14 }}
+          env:
+            - name: TREX_CFG
+              value: /etc/trex_cfg.yaml
+            - name: PYTHONPATH
+              value: /opt/trex/v3.06/automation/trex_control_plane/interactive
+          volumeMounts:
+            - name: trex-cfg
+              mountPath: /etc/trex/trex_cfg.yaml
+              subPath: trex_cfg.yaml
+            - name: dev-vfio
+              mountPath: /dev/vfio
+            - name: hugepages
+              mountPath: /mnt/huge
+            - name: trex-scripts
+              mountPath: /opt/trex/scripts
+            - name: results
+              mountPath: /results
+            - name: lib-modules
+              mountPath: /lib/modules
+              readOnly: true
+          ports:
+            - name: rpc
+              containerPort: 4500
+              protocol: TCP
+            - name: rpc-async
+              containerPort: 4501
+              protocol: TCP
+          livenessProbe:
+            tcpSocket:
+              port: rpc
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            tcpSocket:
+              port: rpc
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+
+        {{- if .Values.trex.test.enabled }}
+        - name: test-runner
+          image: "{{ .Values.trex.image.repository }}:{{ .Values.trex.image.tag }}"
+          imagePullPolicy: {{ .Values.trex.image.pullPolicy }}
+          command: ["/bin/bash", "-c"]
+          args:
+            - |
+              echo "[INFO] Waiting for TRex server to be ready..."
+              while ! nc -z -w 2 localhost 4501; do
+                sleep 5
+              done
+              sleep {{ .Values.trex.test.startDelaySeconds }}
+              cd /opt/trex/v3.06
+              python3 /opt/trex/scripts/run_test.py \
+                --profile {{ .Values.trex.test.profile }} \
+                --duration {{ .Values.trex.test.duration }} \
+                --pps {{ .Values.trex.test.pps }}
+              sleep infinity
+          securityContext:
+            runAsUser: 0
+          env:
+            - name: PYTHONPATH
+              value: /opt/trex/v3.06/automation/trex_control_plane/interactive
+          volumeMounts:
+            - name: trex-scripts
+              mountPath: /opt/trex/scripts
+            - name: results
+              mountPath: /results
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "256Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+        {{- end }}
+      volumes:
+        - name: trex-cfg
+          configMap:
+            name: {{ include "travelping-upf-loadtest.fullname" . }}-trex-cfg
+            items:
+              - key: trex_cfg.yaml
+                path: trex_cfg.yaml
+        - name: trex-scripts
+          configMap:
+            name: {{ include "travelping-upf-loadtest.fullname" . }}-trex-scripts
+            defaultMode: 0755
+        - name: dev-vfio
+          hostPath:
+            path: /dev/vfio
+            type: Directory
+        - name: hugepages
+          emptyDir:
+            medium: HugePages
+        - name: results
+          emptyDir: {}
+        - name: lib-modules
+          hostPath:
+            path: /lib/modules
+            type: Directory
+{{- end }}

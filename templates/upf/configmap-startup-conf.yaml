@@ -1,0 +1,53 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "travelping-upf-loadtest.fullname" . }}-upf-startup-conf
+  namespace: {{ .Values.namespace.name }}
+  labels:
+    {{- include "travelping-upf-loadtest.upf.labels" . | nindent 4 }}
+data:
+  startup.conf: |
+    unix {
+      nodaemon
+      log /var/log/vpp/vpp.log
+      full-coredump
+      gid vpp
+      cli-listen /run/vpp/cli.sock
+      exec /etc/vpp/init.conf
+    }
+
+    cpu {
+      main-core CORE1
+      corelist-workers CORE2
+    }
+
+    dpdk {
+      {{- range $name, $iface := .Values.upf.interfaces }}
+      dev {{ $iface.pciAddress }} {name {{ $iface.name }}}
+      {{- end }}
+      # UIO driver for VFIO
+      uio-driver vfio-pci
+      # Hugepages
+      socket-mem 1024
+    }
+
+    api-trace {
+      on
+    }
+
+    api-segment {
+      gid vpp
+    }
+
+    plugins {
+      path /usr/lib/x86_64-linux-gnu/vpp_plugins/
+      plugin dpdk_plugin.so { enable }
+      plugin gtpu_plugin.so { {{ if .Values.upf.vpp.plugins.gtpu_plugin }}enable{{ else }}disable{{ end }} }
+      plugin upf_plugin.so { {{ if .Values.upf.vpp.plugins.upf_plugin }}enable{{ else }}disable{{ end }} }
+    }
+
+    # Statistics segment
+    statseg {
+      per-node-counters on
+      default
+    }

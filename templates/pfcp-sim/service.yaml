@@ -1,0 +1,22 @@
+{{- if .Values.pfcpSim.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "travelping-upf-loadtest.fullname" . }}-pfcp-sim
+  namespace: {{ .Values.namespace.name }}
+  labels:
+    {{- include "travelping-upf-loadtest.pfcp-sim.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    - name: grpc
+      port: 54321
+      targetPort: 54321
+      protocol: TCP
+    - name: pfcp
+      port: 8805
+      targetPort: 8805
+      protocol: UDP
+  selector:
+    {{- include "travelping-upf-loadtest.pfcp-sim.labels" . | nindent 4 }}
+{{- end }}
