@@ -20,7 +20,7 @@ require GHCR credentials.
 ```sh
 helm upgrade --install upf-loadtest \
   oci://ghcr.io/infinitydon/travelping-upf-loadtest \
-  --version 0.1.7 \
+  --version 0.1.8 \
   --namespace upf-loadtest \
   --create-namespace \
   --wait
@@ -30,24 +30,26 @@ To inspect the chart locally:
 
 ```sh
 helm pull oci://ghcr.io/infinitydon/travelping-upf-loadtest \
-  --version 0.1.7 \
+  --version 0.1.8 \
   --untar
 ```
 
 The test result is written to `/results/gtpu-uplink.json` in the TRex
 `test-runner` container and is also printed to its logs.
 
-The default CPU layout keeps the packet-processing applications on disjoint
-host cores because this cluster uses CFS quotas rather than static CPU
-Manager cpusets:
+The node uses kubelet CPU Manager `static` with reserved CPUs. Both
+packet-processing pods have Guaranteed QoS and discover their exclusive
+container cpusets at runtime; the chart does not contain host CPU IDs. The
+entrypoints support both cgroup cpuset files and the process affinity exposed
+by `/proc/self/status`.
 
-- UPG-VPP: main core 2, worker cores 3-4.
-- TRex: master core 5, latency core 6, dataplane core 7.
+- UPG-VPP requests 8 CPUs and assigns the first to its main thread and the
+  remaining 7 to workers.
+- TRex requests 6 CPUs and assigns the first to master, the second to latency,
+  and the remaining 4 to dataplane workers.
 
-Keep these assignments disjoint when overriding either workload. The virtio
-ports expose one TX queue, so TRex must use one dataplane worker. Queue
-pressure is bounded by the WebUI runner rather than hidden by prolonged
-software queue draining.
+TRex's four workers match the four virtio queues configured on both traffic
+interfaces. Change CPU counts, not physical CPU IDs, when tuning the chart.
 
 ## Publish a release
 

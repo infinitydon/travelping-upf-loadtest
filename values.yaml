@@ -41,12 +41,10 @@ upf:
       mtu: 9001
       vrf: 2
 
-  # CPU configuration - auto-detected from cgroup Cpus_allowed_list
-  # Entryoint script will use all allocated cores (first = main, rest = workers)
+  # CPU configuration. With kubelet CPU Manager static and Guaranteed QoS,
+  # the entrypoint discovers its exclusive cpuset at runtime.
   cpu:
     policy: "dedicated"
-    mainCore: 2
-    workerCores: "3-4"
 
   # Hugepages configuration
   hugepages:
@@ -98,11 +96,11 @@ upf:
   # Resource limits (Guaranteed QoS)
   resources:
     requests:
-      cpu: "3"
+      cpu: "8"
       memory: "4Gi"
       hugepages-1Gi: "3Gi"
     limits:
-      cpu: "3"
+      cpu: "8"
       memory: "4Gi"
       hugepages-1Gi: "3Gi"
 
@@ -140,13 +138,11 @@ trex:
       ip: "10.0.5.1/24"
       gateway: "10.0.5.9"
 
-  # CPU configuration
+  # CPU configuration. TRex discovers its exclusive cpuset at runtime:
+  # first CPU = master, second = latency, remaining CPUs = dataplane workers.
   cpu:
-    cores: 1
+    cores: 4
     policy: "dedicated"
-    masterCore: 5
-    latencyCore: 6
-    workerCores: [7]
 
   # Hugepages
   hugepages:
@@ -156,7 +152,6 @@ trex:
   # TRex config
   config:
     portLimit: 2
-    cores: 1
     portInfo:
       - ip: "10.0.3.1"
         defaultGw: "10.0.3.10"
@@ -173,11 +168,11 @@ trex:
   # Resource limits (Guaranteed QoS)
   resources:
     requests:
-      cpu: "3"
+      cpu: "6"
       memory: "2Gi"
       hugepages-1Gi: "2Gi"
     limits:
-      cpu: "3"
+      cpu: "6"
       memory: "2Gi"
       hugepages-1Gi: "2Gi"
 

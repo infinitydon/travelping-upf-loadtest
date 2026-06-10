@@ -46,6 +46,13 @@ spec:
               echo "[INFO] Resource verification complete"
           securityContext:
             privileged: true
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "64Mi"
+            limits:
+              cpu: "100m"
+              memory: "64Mi"
           volumeMounts:
             - name: dev-vfio
               mountPath: /dev/vfio

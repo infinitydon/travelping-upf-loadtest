@@ -7,26 +7,74 @@ metadata:
   labels:
     {{- include "travelping-upf-loadtest.trex.labels" . | nindent 4 }}
 data:
-  trex_cfg.yaml: |
+  start-trex.sh: |
+    #!/bin/bash
+    set -euo pipefail
+
+    expectedWorkers={{ .Values.trex.cpu.cores }}
+    expectedCpus=$((expectedWorkers + 2))
+    expandCpuSet() {
+      mapfile -t cpus < <(python3 - "$1" <<'PY'
+    import sys
+
+    for group in filter(None, sys.argv[1].split(",")):
+        if "-" in group:
+            start, end = map(int, group.split("-", 1))
+            for cpu in range(start, end + 1):
+                print(cpu)
+        else:
+            print(int(group))
+    PY
+      )
+    }
+
+    cpuSet="$(cat /sys/fs/cgroup/cpuset.cpus.effective 2>/dev/null || true)"
+    expandCpuSet "$cpuSet"
+    if [ "${#cpus[@]}" -ne "$expectedCpus" ]; then
+      cpuSet="$(awk '/Cpus_allowed_list/ {print $2}' /proc/self/status)"
+      expandCpuSet "$cpuSet"
+    fi
+    if [ "${#cpus[@]}" -ne "$expectedCpus" ]; then
+      echo "[ERROR] Expected $expectedCpus exclusive TRex CPUs, got ${#cpus[@]}: $cpuSet"
+      exit 1
+    fi
+
+    masterCore="${cpus[0]}"
+    latencyCore="${cpus[1]}"
+    workerCores=("${cpus[@]:2:expectedWorkers}")
+    echo "[INFO] Assigned cpuset=$cpuSet masterCore=$masterCore latencyCore=$latencyCore workerCores=${workerCores[*]}"
+
+    cat >/etc/trex_cfg.yaml <<EOF
     - port_limit    : {{ .Values.trex.config.portLimit }}
       version       : 2
-      c             : {{ .Values.trex.config.cores }}
-      interfaces    : 
-      {{- range $name, $iface := .Values.trex.interfaces }}
+      c             : ${#workerCores[@]}
+      interfaces    :
+    {{- range $name, $iface := .Values.trex.interfaces }}
         - "{{ $iface.pciAddress }}"
-      {{- end }}
+    {{- end }}
       platform      :
-        master_thread_id  : {{ .Values.trex.cpu.masterCore }}
-        latency_thread_id : {{ .Values.trex.cpu.latencyCore }}
+        master_thread_id  : ${masterCore}
+        latency_thread_id : ${latencyCore}
         dual_if:
           - socket  : 0
             threads :
-            {{- range .Values.trex.cpu.workerCores }}
-              - {{ . }}
-            {{- end }}
+    EOF
+    for cpu in "${workerCores[@]}"; do
+      printf '              - %s\n' "$cpu" >>/etc/trex_cfg.yaml
+    done
+    cat >>/etc/trex_cfg.yaml <<EOF
       port_info     :
-      {{- range $iface := .Values.trex.config.portInfo }}
+    {{- range $iface := .Values.trex.config.portInfo }}
         - ip         : {{ $iface.ip }}
           default_gw : {{ $iface.defaultGw }}
-      {{- end }}
+    {{- end }}
+    EOF
+
+    echo "[INFO] Final /etc/trex_cfg.yaml:"
+    cat /etc/trex_cfg.yaml
+    cd /opt/trex/v3.06
+    exec ./t-rex-64 -i --stl --cfg /etc/trex_cfg.yaml \
+      --prefix "$(hostname)" \
+      --no-hw-flow-stat \
+      --mbuf-factor 2
 {{- end }}

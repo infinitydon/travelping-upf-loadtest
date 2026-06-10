@@ -46,6 +46,13 @@ spec:
               echo "[INFO] Resource verification complete"
           securityContext:
             privileged: true
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "64Mi"
+            limits:
+              cpu: "100m"
+              memory: "64Mi"
           volumeMounts:
             - name: dev-vfio
               mountPath: /dev/vfio
@@ -58,13 +65,7 @@ spec:
           command: ["/bin/bash", "-c"]
           args:
             - |
-              echo "[INFO] Starting TRex server..."
-              cp /etc/trex/trex_cfg.yaml /etc/trex_cfg.yaml
-              cd /opt/trex/v3.06
-              exec ./t-rex-64 -i --stl --cfg /etc/trex_cfg.yaml \
-                --prefix $(hostname) \
-                --no-hw-flow-stat \
-                --mbuf-factor 2
+              exec /opt/trex/start-trex.sh
           securityContext:
             privileged: true
             capabilities:
@@ -86,8 +87,8 @@ spec:
               value: /opt/trex/v3.06/automation/trex_control_plane/interactive
           volumeMounts:
             - name: trex-cfg
-              mountPath: /etc/trex/trex_cfg.yaml
-              subPath: trex_cfg.yaml
+              mountPath: /opt/trex/start-trex.sh
+              subPath: start-trex.sh
             - name: dev-vfio
               mountPath: /dev/vfio
             - name: hugepages
@@ -151,8 +152,8 @@ spec:
               mountPath: /results
           resources:
             requests:
-              cpu: "250m"
-              memory: "256Mi"
+              cpu: "500m"
+              memory: "512Mi"
             limits:
               cpu: "500m"
               memory: "512Mi"
@@ -162,8 +163,9 @@ spec:
           configMap:
             name: {{ include "travelping-upf-loadtest.fullname" . }}-trex-cfg
             items:
-              - key: trex_cfg.yaml
-                path: trex_cfg.yaml
+              - key: start-trex.sh
+                path: start-trex.sh
+            defaultMode: 0755
         - name: trex-scripts
           configMap:
             name: {{ include "travelping-upf-loadtest.fullname" . }}-trex-scripts

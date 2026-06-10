@@ -13,12 +13,37 @@ data:
     echo "[INFO] Copying startup config template..."
     cp /etc/vpp/startup.conf.template /etc/vpp/startup.conf
 
-    # This cluster uses CFS CPU quotas rather than static cpusets, so explicit
-    # VPP pinning is required to avoid consuming every online CPU.
-    mainCore="{{ .Values.upf.cpu.mainCore }}"
-    workerCore="{{ .Values.upf.cpu.workerCores }}"
+    expectedCpus={{ .Values.upf.resources.requests.cpu }}
+    expandCpuSet() {
+      cpus=()
+      IFS=',' read -ra cpuGroups <<< "$1"
+      for group in "${cpuGroups[@]}"; do
+        if [[ "$group" == *-* ]]; then
+          start="${group%-*}"
+          end="${group#*-}"
+          for ((cpu=start; cpu<=end; cpu++)); do
+            cpus+=("$cpu")
+          done
+        elif [ -n "$group" ]; then
+          cpus+=("$group")
+        fi
+      done
+    }
 
-    echo "[INFO] Using mainCore=$mainCore and workerCore=$workerCore"
+    cpuSet="$(cat /sys/fs/cgroup/cpuset.cpus.effective 2>/dev/null || true)"
+    expandCpuSet "$cpuSet"
+    if [ "${#cpus[@]}" -ne "$expectedCpus" ]; then
+      cpuSet="$(awk '/Cpus_allowed_list/ {print $2}' /proc/self/status)"
+      expandCpuSet "$cpuSet"
+    fi
+    if [ "${#cpus[@]}" -ne "$expectedCpus" ]; then
+      echo "[ERROR] Expected $expectedCpus exclusive VPP CPUs, got ${#cpus[@]}: $cpuSet"
+      exit 1
+    fi
+
+    mainCore="${cpus[0]}"
+    workerCore="$(IFS=,; echo "${cpus[*]:1}")"
+    echo "[INFO] Assigned cpuset=$cpuSet mainCore=$mainCore workerCores=$workerCore"
 
     # Replace placeholders in startup.conf
     sed -i "s/CORE1/$mainCore/g" /etc/vpp/startup.conf
