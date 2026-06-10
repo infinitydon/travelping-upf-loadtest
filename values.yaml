@@ -200,7 +200,7 @@ pfcpSim:
     enabled: true
   image:
     repository: "ghcr.io/infinitydon/pfcpsim-travelping"
-    tag: "v1.4.4-9"
+    tag: "v1.4.4-10"
     pullPolicy: IfNotPresent
 
   # PFCP simulator configuration
