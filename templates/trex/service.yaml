@@ -20,4 +20,24 @@ spec:
       protocol: TCP
   selector:
     {{- include "travelping-upf-loadtest.trex.selectorLabels" . | nindent 4 }}
+{{- if and .Values.monitoring.enabled .Values.monitoring.trexExporter.enabled }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "travelping-upf-loadtest.fullname" . }}-trex-metrics
+  namespace: {{ .Values.namespace.name }}
+  labels:
+    {{- include "travelping-upf-loadtest.trex.labels" . | nindent 4 }}
+    service: metrics
+spec:
+  type: ClusterIP
+  ports:
+    - name: metrics
+      port: {{ .Values.monitoring.trexExporter.port }}
+      targetPort: metrics
+      protocol: TCP
+  selector:
+    {{- include "travelping-upf-loadtest.trex.selectorLabels" . | nindent 4 }}
+{{- end }}
 {{- end }}

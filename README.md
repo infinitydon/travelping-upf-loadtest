@@ -20,7 +20,7 @@ require GHCR credentials.
 ```sh
 helm upgrade --install upf-loadtest \
   oci://ghcr.io/infinitydon/travelping-upf-loadtest \
-  --version 0.1.14 \
+  --version 0.1.15 \
   --namespace upf-loadtest \
   --create-namespace \
   --wait
@@ -30,12 +30,21 @@ To inspect the chart locally:
 
 ```sh
 helm pull oci://ghcr.io/infinitydon/travelping-upf-loadtest \
-  --version 0.1.14 \
+  --version 0.1.15 \
   --untar
 ```
 
 The test result is written to `/results/gtpu-uplink.json` in the TRex
 `test-runner` container and is also printed to its logs.
+
+## Monitoring
+
+Prometheus and Grafana are installed separately from the upstream
+`kube-prometheus-stack` chart. This chart supplies the VPP and TRex exporters,
+`ServiceMonitor` and `PrometheusRule` resources, and a provisioned Grafana
+dashboard with PPS plus L1/L2 bandwidth panels.
+
+See [docs/monitoring.md](docs/monitoring.md) for installation and validation.
 
 The node uses kubelet CPU Manager `static` with reserved CPUs. Both
 packet-processing pods have Guaranteed QoS and discover their exclusive

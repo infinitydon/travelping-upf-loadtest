@@ -1,0 +1,136 @@
+{{- if and .Values.monitoring.enabled .Values.monitoring.grafanaDashboards.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "travelping-upf-loadtest.fullname" . }}-grafana-dashboard
+  namespace: {{ .Values.namespace.name }}
+  labels:
+    {{- include "travelping-upf-loadtest.labels" . | nindent 4 }}
+    {{- with .Values.monitoring.grafanaDashboards.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+data:
+  travelping-upf-loadtest.json: |
+    {
+      "annotations": {"list": []},
+      "editable": true,
+      "graphTooltip": 1,
+      "panels": [
+        {
+          "type": "stat",
+          "title": "TRex Status",
+          "gridPos": {"h": 4, "w": 4, "x": 0, "y": 0},
+          "targets": [{"expr": "max(trex_up{namespace=\"$namespace\"}) or vector(0)", "legendFormat": "TRex"}],
+          "fieldConfig": {"defaults": {"mappings": [{"type": "value", "options": {"0": {"text": "DOWN"}, "1": {"text": "UP"}}}], "thresholds": {"mode": "absolute", "steps": [{"color": "red"}, {"color": "green", "value": 1}]}}}
+        },
+        {
+          "type": "stat",
+          "title": "N3 TX Throughput",
+          "gridPos": {"h": 4, "w": 5, "x": 4, "y": 0},
+          "targets": [{"expr": "max(trex_port_tx_pps{namespace=\"$namespace\",port=\"0\"})", "legendFormat": "pps"}],
+          "fieldConfig": {"defaults": {"unit": "pps"}}
+        },
+        {
+          "type": "stat",
+          "title": "N6 RX Throughput",
+          "gridPos": {"h": 4, "w": 5, "x": 9, "y": 0},
+          "targets": [{"expr": "max(trex_port_rx_pps{namespace=\"$namespace\",port=\"1\"})", "legendFormat": "pps"}],
+          "fieldConfig": {"defaults": {"unit": "pps"}}
+        },
+        {
+          "type": "stat",
+          "title": "End-to-End Packet Loss",
+          "gridPos": {"h": 4, "w": 5, "x": 14, "y": 0},
+          "targets": [{"expr": "clamp_min(100 * (sum(rate(trex_port_tx_packets_total{namespace=\"$namespace\",port=\"0\"}[30s])) - sum(rate(trex_port_rx_packets_total{namespace=\"$namespace\",port=\"1\"}[30s]))) / clamp_min(sum(rate(trex_port_tx_packets_total{namespace=\"$namespace\",port=\"0\"}[30s])), 1), 0)", "legendFormat": "loss"}],
+          "fieldConfig": {"defaults": {"unit": "percent"}}
+        },
+        {
+          "type": "stat",
+          "title": "TRex Queue Full",
+          "gridPos": {"h": 4, "w": 5, "x": 19, "y": 0},
+          "targets": [{"expr": "max(trex_queue_full_total{namespace=\"$namespace\"})", "legendFormat": "events"}]
+        },
+        {
+          "type": "timeseries",
+          "title": "Packet Throughput",
+          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 4},
+          "targets": [
+            {"expr": "max(trex_port_tx_pps{namespace=\"$namespace\",port=\"0\"})", "legendFormat": "N3 TX"},
+            {"expr": "max(trex_port_rx_pps{namespace=\"$namespace\",port=\"1\"})", "legendFormat": "N6 RX"}
+          ],
+          "fieldConfig": {"defaults": {"unit": "pps"}}
+        },
+        {
+          "type": "timeseries",
+          "title": "TRex Bandwidth (L1 and L2)",
+          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 4},
+          "targets": [
+            {"expr": "max(trex_port_tx_l1_bps{namespace=\"$namespace\",port=\"0\"}) / 1e6", "legendFormat": "N3 TX L1"},
+            {"expr": "max(trex_port_tx_l2_bps{namespace=\"$namespace\",port=\"0\"}) / 1e6", "legendFormat": "N3 TX L2"},
+            {"expr": "max(trex_port_rx_l1_bps{namespace=\"$namespace\",port=\"1\"}) / 1e6", "legendFormat": "N6 RX L1"},
+            {"expr": "max(trex_port_rx_l2_bps{namespace=\"$namespace\",port=\"1\"}) / 1e6", "legendFormat": "N6 RX L2"}
+          ],
+          "fieldConfig": {"defaults": {"unit": "Mbps"}}
+        },
+        {
+          "type": "timeseries",
+          "title": "VPP Interface Packet Rate",
+          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 12},
+          "targets": [
+            {"expr": "sum by (interface_name) (rate(_if_rx_packets{namespace=\"$namespace\",interface_name=~\"n3|n6\"}[30s]))", "legendFormat": "{{ "{{interface_name}}" }} RX"},
+            {"expr": "sum by (interface_name) (rate(_if_tx_packets{namespace=\"$namespace\",interface_name=~\"n3|n6\"}[30s]))", "legendFormat": "{{ "{{interface_name}}" }} TX"}
+          ],
+          "fieldConfig": {"defaults": {"unit": "pps"}}
+        },
+        {
+          "type": "timeseries",
+          "title": "VPP Interface Bandwidth",
+          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 12},
+          "targets": [
+            {"expr": "sum by (interface_name) (rate(_if_rx_bytes{namespace=\"$namespace\",interface_name=~\"n3|n6\"}[30s])) * 8 / 1e6", "legendFormat": "{{ "{{interface_name}}" }} RX"},
+            {"expr": "sum by (interface_name) (rate(_if_tx_bytes{namespace=\"$namespace\",interface_name=~\"n3|n6\"}[30s])) * 8 / 1e6", "legendFormat": "{{ "{{interface_name}}" }} TX"}
+          ],
+          "fieldConfig": {"defaults": {"unit": "Mbps"}}
+        },
+        {
+          "type": "timeseries",
+          "title": "TRex CPU",
+          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 20},
+          "targets": [
+            {"expr": "max(trex_cpu_util_percent{namespace=\"$namespace\"})", "legendFormat": "aggregate"},
+            {"expr": "max by (worker) (trex_worker_cpu_percent{namespace=\"$namespace\"})", "legendFormat": "worker {{ "{{worker}}" }}"}
+          ],
+          "fieldConfig": {"defaults": {"unit": "percent"}}
+        },
+        {
+          "type": "timeseries",
+          "title": "VPP Dataplane Health",
+          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 20},
+          "targets": [
+            {"expr": "sum(rate(_if_rx_miss{namespace=\"$namespace\"}[30s]))", "legendFormat": "RX misses/s"},
+            {"expr": "sum(rate(_if_rx_no_buf{namespace=\"$namespace\"}[30s]))", "legendFormat": "No buffer/s"},
+            {"expr": "max(sys_vector_rate{namespace=\"$namespace\"})", "legendFormat": "Vector rate"}
+          ]
+        }
+      ],
+      "refresh": "2s",
+      "schemaVersion": 41,
+      "tags": ["travelping", "upf", "trex"],
+      "templating": {
+        "list": [
+          {
+            "name": "namespace",
+            "type": "query",
+            "query": "label_values(trex_up, namespace)",
+            "current": {"text": "{{ .Values.namespace.name }}", "value": "{{ .Values.namespace.name }}"},
+            "refresh": 1
+          }
+        ]
+      },
+      "time": {"from": "now-15m", "to": "now"},
+      "timezone": "browser",
+      "title": "Travelping UPF Load Test",
+      "uid": "travelping-upf-loadtest",
+      "version": 1
+    }
+{{- end }}

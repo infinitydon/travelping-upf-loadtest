@@ -1,0 +1,71 @@
+crds:
+  enabled: true
+
+prometheusOperator:
+  nodeSelector:
+    kubernetes.io/hostname: ebpf-bng-cp-01
+
+kube-state-metrics:
+  nodeSelector:
+    kubernetes.io/hostname: ebpf-bng-cp-01
+
+alertmanager:
+  alertmanagerSpec:
+    nodeSelector:
+      kubernetes.io/hostname: ebpf-bng-cp-01
+    storage:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: microk8s-hostpath
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 2Gi
+
+prometheus:
+  service:
+    type: NodePort
+    nodePort: 30900
+  prometheusSpec:
+    nodeSelector:
+      kubernetes.io/hostname: ebpf-bng-cp-01
+    retention: 7d
+    serviceMonitorSelectorNilUsesHelmValues: false
+    serviceMonitorSelector: {}
+    serviceMonitorNamespaceSelector: {}
+    ruleSelectorNilUsesHelmValues: false
+    ruleSelector: {}
+    ruleNamespaceSelector: {}
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: microk8s-hostpath
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 20Gi
+
+grafana:
+  nodeSelector:
+    kubernetes.io/hostname: ebpf-bng-cp-01
+  service:
+    type: NodePort
+    nodePort: 30300
+  persistence:
+    enabled: true
+    storageClassName: microk8s-hostpath
+    size: 5Gi
+  admin:
+    existingSecret: monitoring-grafana-admin
+    userKey: admin-user
+    passwordKey: admin-password
+  sidecar:
+    # Needed for MicroK8s API CAs without the key-usage extension expected by
+    # newer Python/OpenSSL clients in the Grafana sidecar.
+    skipTlsVerify: true
+    dashboards:
+      enabled: true
+      searchNamespace: ALL
+
+prometheus-node-exporter:
+  enabled: true

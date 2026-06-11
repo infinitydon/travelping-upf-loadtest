@@ -1,0 +1,50 @@
+{{- if and .Values.monitoring.enabled .Values.monitoring.prometheusRule.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ include "travelping-upf-loadtest.fullname" . }}
+  namespace: {{ .Values.namespace.name }}
+  labels:
+    {{- include "travelping-upf-loadtest.labels" . | nindent 4 }}
+    {{- with .Values.monitoring.prometheusRule.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  groups:
+    - name: travelping-upf-loadtest
+      rules:
+        - alert: TRexExporterDown
+          expr: trex_up == 0 or absent(trex_up)
+          for: 30s
+          labels:
+            severity: critical
+          annotations:
+            summary: TRex exporter cannot reach the TRex server
+        - alert: TRexQueuePressure
+          expr: increase(trex_queue_full_total[1m]) > 0
+          labels:
+            severity: warning
+          annotations:
+            summary: TRex reported packet queue pressure
+        - alert: TRexWorkerHighCPU
+          expr: max by (pod) (trex_worker_cpu_percent) > 85
+          for: 1m
+          labels:
+            severity: warning
+          annotations:
+            summary: TRex dataplane worker CPU is above 85 percent
+        - alert: VPPRxMisses
+          expr: sum by (pod) (rate(_if_rx_miss[1m])) > 0
+          for: 30s
+          labels:
+            severity: warning
+          annotations:
+            summary: VPP is reporting receive misses
+        - alert: VPPNoBufferDrops
+          expr: sum by (pod) (rate(_if_rx_no_buf[1m])) > 0
+          for: 30s
+          labels:
+            severity: warning
+          annotations:
+            summary: VPP is dropping packets because receive buffers are unavailable
+{{- end }}

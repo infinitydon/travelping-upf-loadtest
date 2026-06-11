@@ -21,6 +21,7 @@ upf:
   interfaces:
     n3:
       name: "n3"
+      metricIndex: "1"
       pciAddress: "0000:01:00.0"
       rxQueues: 4
       txQueues: 4
@@ -31,6 +32,7 @@ upf:
       vrf: 1
     n4:
       name: "n4"
+      metricIndex: "2"
       pciAddress: "0000:02:00.0"
       rxQueues: 1
       txQueues: 1
@@ -40,6 +42,7 @@ upf:
       vrf: 0
     n6:
       name: "n6"
+      metricIndex: "3"
       pciAddress: "0000:03:00.0"
       rxQueues: 4
       txQueues: 4
@@ -258,15 +261,52 @@ pfcpSim:
 # Monitoring Configuration
 monitoring:
   enabled: false
-  prometheus:
+  trexExporter:
     enabled: true
-    port: 9090
-  grafana:
-    enabled: false
+    port: 9483
+    intervalSeconds: 1
+    resources:
+      requests:
+        cpu: "100m"
+        memory: "128Mi"
+      limits:
+        cpu: "100m"
+        memory: "128Mi"
+  vppExporter:
+    enabled: true
+    port: 9482
+    patterns:
+      - "/if/rx"
+      - "/if/tx"
+      - "/if/drops"
+      - "/sys/vector_rate"
+      - "/sys/vector_rate_per_worker"
+      - "/sys/num_worker_threads"
+      - "/sys/input_rate"
+      - "/upf/pool/sessions/used"
+      - "/upf/wk/flows/count"
+      - "/upf/thread/sessions"
+    resources:
+      requests:
+        cpu: "100m"
+        memory: "128Mi"
+      limits:
+        cpu: "100m"
+        memory: "128Mi"
   serviceMonitor:
-    enabled: false
-    interval: 15s
-    scrapeTimeout: 10s
+    enabled: true
+    interval: 2s
+    scrapeTimeout: 1500ms
+    labels:
+      release: monitoring
+  prometheusRule:
+    enabled: true
+    labels:
+      release: monitoring
+  grafanaDashboards:
+    enabled: true
+    labels:
+      grafana_dashboard: "1"
 
 # Test orchestration
 testOrchestration:

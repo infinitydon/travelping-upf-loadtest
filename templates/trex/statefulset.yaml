@@ -21,6 +21,9 @@ spec:
         cpu-policy: {{ .Values.trex.cpu.policy }}
         checksum/config: {{ include (print $.Template.BasePath "/trex/configmap-trex-cfg.yaml") . | sha256sum }}
         checksum/scripts: {{ include (print $.Template.BasePath "/trex/configmap-trex-scripts.yaml") . | sha256sum }}
+        {{- if and .Values.monitoring.enabled .Values.monitoring.trexExporter.enabled }}
+        checksum/exporter: {{ include (print $.Template.BasePath "/trex/configmap-trex-exporter.yaml") . | sha256sum }}
+        {{- end }}
     spec:
       serviceAccountName: {{ include "travelping-upf-loadtest.serviceAccountName" . }}
       {{- if .Values.global.imagePullSecrets }}
@@ -122,6 +125,38 @@ spec:
             timeoutSeconds: 3
             failureThreshold: 3
 
+        {{- if and .Values.monitoring.enabled .Values.monitoring.trexExporter.enabled }}
+        - name: metrics-exporter
+          image: "{{ .Values.trex.image.repository }}:{{ .Values.trex.image.tag }}"
+          imagePullPolicy: {{ .Values.trex.image.pullPolicy }}
+          command: ["python3", "/opt/trex/exporter/exporter.py"]
+          env:
+            - name: PYTHONPATH
+              value: {{ printf "%s/automation/trex_control_plane/interactive" .Values.trex.installDir | quote }}
+            - name: TREX_SERVER
+              value: "127.0.0.1"
+            - name: EXPORTER_PORT
+              value: {{ .Values.monitoring.trexExporter.port | quote }}
+            - name: EXPORTER_INTERVAL_SECONDS
+              value: {{ .Values.monitoring.trexExporter.intervalSeconds | quote }}
+          ports:
+            - name: metrics
+              containerPort: {{ .Values.monitoring.trexExporter.port }}
+              protocol: TCP
+          resources:
+            {{- toYaml .Values.monitoring.trexExporter.resources | nindent 12 }}
+          volumeMounts:
+            - name: trex-exporter
+              mountPath: /opt/trex/exporter
+              readOnly: true
+          readinessProbe:
+            httpGet:
+              path: /metrics
+              port: metrics
+            initialDelaySeconds: 5
+            periodSeconds: 5
+        {{- end }}
+
         {{- if .Values.trex.test.enabled }}
         - name: test-runner
           image: "{{ .Values.trex.image.repository }}:{{ .Values.trex.image.tag }}"
@@ -170,6 +205,11 @@ spec:
           configMap:
             name: {{ include "travelping-upf-loadtest.fullname" . }}-trex-scripts
             defaultMode: 0755
+        {{- if and .Values.monitoring.enabled .Values.monitoring.trexExporter.enabled }}
+        - name: trex-exporter
+          configMap:
+            name: {{ include "travelping-upf-loadtest.fullname" . }}-trex-exporter
+        {{- end }}
         - name: dev-vfio
           hostPath:
             path: /dev/vfio

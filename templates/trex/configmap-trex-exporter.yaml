@@ -1,0 +1,146 @@
+{{- if and .Values.monitoring.enabled .Values.trex.enabled .Values.monitoring.trexExporter.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "travelping-upf-loadtest.fullname" . }}-trex-exporter
+  namespace: {{ .Values.namespace.name }}
+  labels:
+    {{- include "travelping-upf-loadtest.trex.labels" . | nindent 4 }}
+data:
+  exporter.py: |
+    import math
+    import os
+    import threading
+    import time
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+    from trex.stl.api import STLClient
+
+    HOST = os.environ.get("TREX_SERVER", "127.0.0.1")
+    PORT = int(os.environ.get("EXPORTER_PORT", "9483"))
+    INTERVAL = float(os.environ.get("EXPORTER_INTERVAL_SECONDS", "1"))
+
+    lock = threading.Lock()
+    snapshot = {"trex_up": 0.0}
+
+
+    def number(value):
+        try:
+            value = float(value)
+            return value if math.isfinite(value) else 0.0
+        except (TypeError, ValueError):
+            return 0.0
+
+
+    def collect():
+        client = STLClient(server=HOST)
+        while True:
+            metrics = {"trex_up": 0.0}
+            try:
+                if not client.is_connected():
+                    client.connect()
+                stats = client.get_stats(ports=[0, 1])
+                port_info = {
+                    str(entry["index"]): entry
+                    for entry in client.get_port_info(ports=[0, 1])
+                }
+                util = client.get_util_stats().get("cpu", [])
+                global_stats = stats.get("global", {})
+                metrics.update({
+                    "trex_up": 1.0,
+                    "trex_cpu_util_percent": number(global_stats.get("cpu_util")),
+                    "trex_queue_full_total": number(global_stats.get("queue_full")),
+                })
+                for worker, entry in enumerate(util):
+                    history = entry.get("history") or [0]
+                    metrics[("trex_worker_cpu_percent", str(worker))] = number(history[-1])
+                for port in (0, 1):
+                    port_stats = stats.get(port, {})
+                    values = {
+                        "trex_port_tx_packets_total": port_stats.get("opackets"),
+                        "trex_port_rx_packets_total": port_stats.get("ipackets"),
+                        "trex_port_tx_bytes_total": port_stats.get("obytes"),
+                        "trex_port_rx_bytes_total": port_stats.get("ibytes"),
+                        "trex_port_tx_errors_total": port_stats.get("oerrors"),
+                        "trex_port_rx_errors_total": port_stats.get("ierrors"),
+                        "trex_port_tx_pps": port_stats.get("tx_pps"),
+                        "trex_port_rx_pps": port_stats.get("rx_pps"),
+                        "trex_port_tx_l1_bps": port_stats.get("tx_bps_L1"),
+                        "trex_port_rx_l1_bps": port_stats.get("rx_bps_L1"),
+                        "trex_port_tx_l2_bps": port_stats.get("tx_bps"),
+                        "trex_port_rx_l2_bps": port_stats.get("rx_bps"),
+                        "trex_port_link_up": 1 if port_info[str(port)].get("link") == "UP" else 0,
+                        "trex_port_speed_bps": number(port_info[str(port)].get("speed")) * 1e9,
+                    }
+                    for name, value in values.items():
+                        metrics[(name, str(port))] = number(value)
+            except Exception:
+                try:
+                    client.disconnect()
+                except Exception:
+                    pass
+            with lock:
+                snapshot.clear()
+                snapshot.update(metrics)
+            time.sleep(INTERVAL)
+
+
+    TYPES = {
+        "trex_up": "gauge",
+        "trex_cpu_util_percent": "gauge",
+        "trex_queue_full_total": "counter",
+        "trex_worker_cpu_percent": "gauge",
+        "trex_port_tx_packets_total": "counter",
+        "trex_port_rx_packets_total": "counter",
+        "trex_port_tx_bytes_total": "counter",
+        "trex_port_rx_bytes_total": "counter",
+        "trex_port_tx_errors_total": "counter",
+        "trex_port_rx_errors_total": "counter",
+        "trex_port_tx_pps": "gauge",
+        "trex_port_rx_pps": "gauge",
+        "trex_port_tx_l1_bps": "gauge",
+        "trex_port_rx_l1_bps": "gauge",
+        "trex_port_tx_l2_bps": "gauge",
+        "trex_port_rx_l2_bps": "gauge",
+        "trex_port_link_up": "gauge",
+        "trex_port_speed_bps": "gauge",
+    }
+
+
+    def exposition():
+        with lock:
+            metrics = dict(snapshot)
+        lines = []
+        emitted = set()
+        for key, value in sorted(metrics.items(), key=lambda item: str(item[0])):
+            name = key if isinstance(key, str) else key[0]
+            if name not in emitted:
+                lines.append(f"# TYPE {name} {TYPES.get(name, 'gauge')}")
+                emitted.add(name)
+            if isinstance(key, tuple):
+                label = "worker" if name == "trex_worker_cpu_percent" else "port"
+                lines.append(f'{name}' + '{' + f'{label}="{key[1]}"' + '}' + f' {value}')
+            else:
+                lines.append(f"{name} {value}")
+        return ("\n".join(lines) + "\n").encode()
+
+
+    class Handler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            if self.path not in ("/", "/metrics"):
+                self.send_error(404)
+                return
+            body = exposition()
+            self.send_response(200)
+            self.send_header("Content-Type", "text/plain; version=0.0.4")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, *_):
+            pass
+
+
+    threading.Thread(target=collect, daemon=True).start()
+    ThreadingHTTPServer(("0.0.0.0", PORT), Handler).serve_forever()
+{{- end }}

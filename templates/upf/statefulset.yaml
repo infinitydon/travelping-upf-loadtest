@@ -126,6 +126,42 @@ spec:
             periodSeconds: 5
             timeoutSeconds: 3
             failureThreshold: 3
+        {{- if and .Values.monitoring.enabled .Values.monitoring.vppExporter.enabled }}
+        - name: metrics-exporter
+          image: "{{ .Values.upf.image.repository }}:{{ .Values.upf.image.tag }}"
+          imagePullPolicy: {{ .Values.upf.image.pullPolicy }}
+          command: ["/bin/bash", "-c"]
+          args:
+            - |
+              until test -S /run/vpp/stats.sock; do
+                sleep 1
+              done
+              exec /usr/bin/vpp_prometheus_export \
+                socket-name /run/vpp/stats.sock \
+                port {{ .Values.monitoring.vppExporter.port }} \
+                v2 \
+                {{- range .Values.monitoring.vppExporter.patterns }}
+                {{ . | quote }} \
+                {{- end }}
+                /sys/heartbeat
+          ports:
+            - name: metrics
+              containerPort: {{ .Values.monitoring.vppExporter.port }}
+              protocol: TCP
+          resources:
+            {{- toYaml .Values.monitoring.vppExporter.resources | nindent 12 }}
+          volumeMounts:
+            - name: vpp-run
+              mountPath: /run/vpp
+              readOnly: true
+          readinessProbe:
+            httpGet:
+              path: /metrics
+              port: metrics
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+        {{- end }}
       volumes:
         - name: startup-conf
           configMap:

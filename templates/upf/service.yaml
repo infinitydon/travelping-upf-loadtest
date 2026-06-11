@@ -52,4 +52,24 @@ spec:
       protocol: TCP
   selector:
     {{- include "travelping-upf-loadtest.upf.selectorLabels" . | nindent 4 }}
+{{- if and .Values.monitoring.enabled .Values.monitoring.vppExporter.enabled }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "travelping-upf-loadtest.fullname" . }}-upf-metrics
+  namespace: {{ .Values.namespace.name }}
+  labels:
+    {{- include "travelping-upf-loadtest.upf.labels" . | nindent 4 }}
+    service: metrics
+spec:
+  type: ClusterIP
+  ports:
+    - name: metrics
+      port: {{ .Values.monitoring.vppExporter.port }}
+      targetPort: metrics
+      protocol: TCP
+  selector:
+    {{- include "travelping-upf-loadtest.upf.selectorLabels" . | nindent 4 }}
+{{- end }}
 {{- end }}
